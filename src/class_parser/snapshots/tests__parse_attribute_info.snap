@@ -1,0 +1,16 @@
+---
+source: src/class_parser/attribute_info.rs
+expression: parser(&buf).unwrap()
+---
+(
+    [],
+    [
+        AttributeInfo {
+            attribute_name_index: 13,
+            info: [
+                0,
+                14,
+            ],
+        },
+    ],
+)
