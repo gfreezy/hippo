@@ -1,12 +1,13 @@
-mod attribute_info;
-mod constant_pool;
-mod field_info;
-mod method_info;
+pub mod attribute_info;
+pub mod constant_pool;
+pub mod field_info;
+pub mod method_info;
 
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPoolInfo};
 use crate::class_parser::field_info::{parse_field_info, FieldInfo};
 use crate::class_parser::method_info::{parse_method_info, MethodInfo};
+use anyhow::{ensure, Result};
 use nom::bytes::complete::tag;
 use nom::eof;
 use nom::multi::many_m_n;
@@ -48,6 +49,109 @@ struct ClassFile {
     attributes: Vec<AttributeInfo>,
 }
 
+fn is_bit_set(num: u16, flag: u16) -> bool {
+    num & flag != 0
+}
+
+fn is_bit_clear(num: u16, flag: u16) -> bool {
+    num & flag == 0
+}
+
+impl ClassFile {
+    pub fn new(
+        minor_version: u16,
+        major_version: u16,
+        constant_pool: Vec<ConstPoolInfo>,
+        access_flags: u16,
+        this_class: u16,
+        super_class: u16,
+        interfaces: Vec<u16>,
+        fields: Vec<FieldInfo>,
+        methods: Vec<MethodInfo>,
+        attributes: Vec<AttributeInfo>,
+    ) -> Result<ClassFile> {
+        let class_file = ClassFile {
+            minor_version,
+            major_version,
+            constant_pool,
+            access_flags,
+            this_class,
+            super_class,
+            interfaces,
+            fields,
+            methods,
+            attributes,
+        };
+        class_file.validate_access_flags()?;
+        class_file.validate_this_class()?;
+        class_file.validate_super_class()?;
+        class_file.validate_interfaces()?;
+
+        Ok(class_file)
+    }
+
+    fn validate_access_flags(&self) -> Result<()> {
+        let access_flags = self.access_flags;
+        if is_bit_set(access_flags, ACC_INTERFACE) {
+            ensure!(
+                is_bit_set(access_flags, ACC_ABSTRACT),
+                "ACC_ABSTRACT is set"
+            );
+            ensure!(
+                is_bit_clear(access_flags, ACC_FINAL)
+                    && is_bit_clear(access_flags, ACC_SUPER)
+                    && is_bit_clear(access_flags, ACC_ENUM),
+                "access flags"
+            );
+        } else {
+            ensure!(is_bit_clear(access_flags, ACC_ANNOTATION), "access flags");
+            ensure!(
+                !(is_bit_set(access_flags, ACC_FINAL) && is_bit_set(access_flags, ACC_ABSTRACT)),
+                "access flags"
+            );
+        }
+        Ok(())
+    }
+
+    fn validate_this_class(&self) -> Result<()> {
+        ensure!(
+            self.constant_pool
+                .get(self.this_class as usize)
+                .filter(|entry| entry.is_constant_class_info())
+                .is_some(),
+            "validate this class"
+        );
+        Ok(())
+    }
+
+    fn validate_super_class(&self) -> Result<()> {
+        if self.super_class == 0 {
+            return Ok(());
+        }
+        ensure!(
+            self.constant_pool
+                .get(self.super_class as usize)
+                .filter(|entry| entry.is_constant_class_info())
+                .is_some(),
+            "validate super class"
+        );
+        Ok(())
+    }
+
+    fn validate_interfaces(&self) -> Result<()> {
+        for interface in &self.interfaces {
+            ensure!(
+                self.constant_pool
+                    .get(*interface as usize)
+                    .filter(|entry| entry.is_constant_class_info())
+                    .is_some(),
+                "interface is not class"
+            );
+        }
+        Ok(())
+    }
+}
+
 fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     let (left, _) = tag(&MAGIC_NUMBER.to_be_bytes()[..])(buf)?;
     let (left, minor_version) = be_u16(left)?;
@@ -83,7 +187,7 @@ fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
 
     Ok((
         left,
-        ClassFile {
+        ClassFile::new(
             minor_version,
             major_version,
             constant_pool,
@@ -94,7 +198,8 @@ fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
             fields,
             methods,
             attributes,
-        },
+        )
+        .expect("parse class file"),
     ))
 }
 

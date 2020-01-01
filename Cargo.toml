@@ -10,6 +10,7 @@ edition = "2018"
 anyhow = "1.0.25"
 nom = "5.0.1"
 cesu8 = "1.1.0"
+enum-methods = "0.0.8"
 
 [dev-dependencies]
 insta = "0.12.0"
