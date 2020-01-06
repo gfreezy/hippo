@@ -1,5 +1,5 @@
 use cesu8::from_java_cesu8;
-use enum_methods::EnumIsA;
+use enum_methods::{EnumAsGetters, EnumIsA};
 use nom::multi::length_data;
 use nom::number::complete::{be_f32, be_f64, be_i32, be_i64, be_u16, be_u8};
 use nom::IResult;
@@ -19,7 +19,7 @@ const CONSTANT_METHOD_HANDLE: u8 = 15;
 const CONSTANT_METHOD_TYPE: u8 = 16;
 const CONSTANT_INVOKE_DYNAMIC: u8 = 18;
 
-#[derive(Debug, EnumIsA)]
+#[derive(Debug, EnumIsA, EnumAsGetters)]
 pub(crate) enum ConstPoolInfo {
     ConstantClassInfo {
         name_index: u16,

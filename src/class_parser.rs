@@ -7,6 +7,7 @@ use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPoolInfo};
 use crate::class_parser::field_info::{parse_field_info, FieldInfo};
 use crate::class_parser::method_info::{parse_method_info, MethodInfo};
+use crate::nom_utils::length_many;
 use anyhow::{ensure, Result};
 use nom::bytes::complete::tag;
 use nom::eof;
@@ -84,7 +85,7 @@ impl ClassFile {
         };
         class_file.validate_access_flags()?;
         class_file.validate_this_class()?;
-        class_file.validate_super_class()?;
+        //        class_file.validate_super_class()?;
         class_file.validate_interfaces()?;
 
         Ok(class_file)
@@ -161,28 +162,10 @@ fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     let (left, access_flags) = be_u16(left)?;
     let (left, this_class) = be_u16(left)?;
     let (left, super_class) = be_u16(left)?;
-    let (left, interface_count) = be_u16(left)?;
-    let (left, interfaces) =
-        many_m_n(interface_count as usize, interface_count as usize, be_u16)(left)?;
-    let (left, fields_count) = be_u16(left)?;
-    let before = left;
-    let (left, fields) = many_m_n(
-        fields_count as usize,
-        fields_count as usize,
-        parse_field_info,
-    )(left)?;
-    let (left, method_count) = be_u16(left)?;
-    let (left, methods) = many_m_n(
-        method_count as usize,
-        method_count as usize,
-        parse_method_info,
-    )(left)?;
-    let (left, attributes_count) = be_u16(left)?;
-    let (left, attributes) = many_m_n(
-        attributes_count as usize,
-        attributes_count as usize,
-        parse_attribute_info,
-    )(left)?;
+    let (left, interfaces) = length_many(be_u16, be_u16)(left)?;
+    let (left, fields) = length_many(be_u16, parse_field_info)(left)?;
+    let (left, methods) = length_many(be_u16, parse_method_info)(left)?;
+    let (left, attributes) = length_many(be_u16, parse_attribute_info)(left)?;
     let (left, _) = eof!(left,)?;
 
     Ok((
@@ -246,7 +229,13 @@ mod tests {
             1, 0, 13, 0, 0, 0, 2, 0, 14,
         ];
 
-        assert_debug_snapshot!(parse_class_file(&data).expect("parse class"));
+        let (buf, class) = parse_class_file(&data).expect("parse class");
+        for attr in &class.attributes {
+            let s =
+                class.constant_pool[attr.attribute_name_index as usize - 1].as_constant_utf8_info();
+            dbg!(s);
+        }
+        assert_debug_snapshot!((buf, class));
         Ok(())
     }
 }
