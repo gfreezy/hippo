@@ -1,6 +1,6 @@
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
-use nom::multi::{length_data, many_m_n};
-use nom::number::complete::{be_f32, be_f64, be_i32, be_i64, be_u16, be_u8};
+use nom::multi::many_m_n;
+use nom::number::complete::be_u16;
 use nom::IResult;
 
 #[derive(Debug)]

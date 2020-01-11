@@ -17,32 +17,25 @@ use self::VerificationTypeInfo::{
 };
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::nom_utils::length_many;
-use nom::error::ParseError;
-use nom::multi::{length_data, length_value, many1_count, many_m_n};
+use nom::multi::{length_data, many_m_n};
 use nom::number::complete::{be_u16, be_u32, be_u8};
-use nom::{IResult, InputLength, InputTake, ToUsize};
-
+use nom::IResult;
+#[derive(Debug)]
 pub struct ConstantValueAttribute {
-    attribute_name_index: u16,
     constant_value_index: u16,
 }
 
 pub fn parse_constant_value_attribute(buf: &[u8]) -> IResult<&[u8], ConstantValueAttribute> {
-    let (left, attribute_name_index) = be_u16(buf)?;
-    let (left, attribute_length) = be_u32(left)?;
-    assert_eq!(attribute_length, 2);
-    let (left, constant_value_index) = be_u16(left)?;
+    let (buf, constant_value_index) = be_u16(buf)?;
     Ok((
-        left,
+        buf,
         ConstantValueAttribute {
-            attribute_name_index,
             constant_value_index,
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct ExceptionHandler {
-    attribute_name_index: u16,
     start_pc: u16,
     end_pc: u16,
     handler_pc: u16,
@@ -50,16 +43,14 @@ pub struct ExceptionHandler {
 }
 
 pub fn parse_exception_handler(buf: &[u8]) -> IResult<&[u8], ExceptionHandler> {
-    let (left, attribute_name_index) = be_u16(buf)?;
-    let (left, _attribute_length) = be_u32(left)?;
-    let (left, start_pc) = be_u16(left)?;
-    let (left, end_pc) = be_u16(left)?;
-    let (left, handler_pc) = be_u16(left)?;
-    let (left, catch_type) = be_u16(left)?;
+    let (buf, _attribute_length) = be_u32(buf)?;
+    let (buf, start_pc) = be_u16(buf)?;
+    let (buf, end_pc) = be_u16(buf)?;
+    let (buf, handler_pc) = be_u16(buf)?;
+    let (buf, catch_type) = be_u16(buf)?;
     Ok((
-        left,
+        buf,
         ExceptionHandler {
-            attribute_name_index,
             start_pc,
             end_pc,
             handler_pc,
@@ -67,9 +58,8 @@ pub fn parse_exception_handler(buf: &[u8]) -> IResult<&[u8], ExceptionHandler> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct CodeAttribute {
-    attribute_name_index: u16,
     max_stack: u16,
     max_locals: u16,
     code: Vec<u8>,
@@ -78,28 +68,25 @@ pub struct CodeAttribute {
 }
 
 pub fn parse_code_attribute(buf: &[u8]) -> IResult<&[u8], CodeAttribute> {
-    let (left, attribute_name_index) = be_u16(buf)?;
-    let (left, attribute_length) = be_u32(left)?;
-    let (left, max_stack) = be_u16(left)?;
-    let (left, max_locals) = be_u16(left)?;
-    let (left, code) = length_data(be_u32)(left)?;
-    let (left, exception_table_length) = be_u16(left)?;
-    let (left, exception_table) = many_m_n(
+    let (buf, max_stack) = be_u16(buf)?;
+    let (buf, max_locals) = be_u16(buf)?;
+    let (buf, code) = length_data(be_u32)(buf)?;
+    let (buf, exception_table_length) = be_u16(buf)?;
+    let (buf, exception_table) = many_m_n(
         exception_table_length as usize,
         exception_table_length as usize,
         parse_exception_handler,
-    )(left)?;
-    let (left, attributes_count) = be_u16(left)?;
-    let (left, attributes) = many_m_n(
+    )(buf)?;
+    let (buf, attributes_count) = be_u16(buf)?;
+    let (buf, attributes) = many_m_n(
         attributes_count as usize,
         attributes_count as usize,
         parse_attribute_info,
-    )(left)?;
+    )(buf)?;
 
     Ok((
-        left,
+        buf,
         CodeAttribute {
-            attribute_name_index,
             max_stack,
             max_locals,
             code: code.to_vec(),
@@ -109,6 +96,7 @@ pub fn parse_code_attribute(buf: &[u8]) -> IResult<&[u8], CodeAttribute> {
     ))
 }
 
+#[derive(Debug)]
 pub enum VerificationTypeInfo {
     TopVariableInfo,
     IntegerVariableInfo,
@@ -148,6 +136,7 @@ pub fn parse_verification_type_info(buf: &[u8]) -> IResult<&[u8], VerificationTy
     }
 }
 
+#[derive(Debug)]
 pub enum StackMapFrame {
     SameFrame {
         offset_delta: u16,
@@ -255,44 +244,31 @@ pub fn parse_stack_map_frame(buf: &[u8]) -> IResult<&[u8], StackMapFrame> {
         _ => unreachable!(),
     }
 }
-
+#[derive(Debug)]
 pub struct StackMapTableAttribute {
-    attribute_name_index: u16,
     entries: Vec<StackMapFrame>,
 }
 
 pub fn parse_stack_map_table_attribute(buf: &[u8]) -> IResult<&[u8], StackMapTableAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, entries) = length_many(be_u16, parse_stack_map_frame)(buf)?;
 
-    Ok((
-        buf,
-        StackMapTableAttribute {
-            attribute_name_index,
-            entries,
-        },
-    ))
+    Ok((buf, StackMapTableAttribute { entries }))
 }
-
+#[derive(Debug)]
 pub struct ExceptionsAttribute {
-    attribute_name_index: u16,
     exception_index_table: Vec<u16>,
 }
 
 pub fn parse_exceptions_attribute(buf: &[u8]) -> IResult<&[u8], ExceptionsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, index_table) = length_many(be_u16, be_u16)(buf)?;
     Ok((
         buf,
         ExceptionsAttribute {
-            attribute_name_index,
             exception_index_table: index_table,
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct Class {
     inner_class_info_index: u16,
     outer_class_info_index: u16,
@@ -315,119 +291,76 @@ fn parse_class(buf: &[u8]) -> IResult<&[u8], Class> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct InnerClasses {
-    attribute_name_index: u16,
     classes: Vec<Class>,
 }
 
 pub fn parse_inner_class(buf: &[u8]) -> IResult<&[u8], InnerClasses> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, classes) = length_many(be_u16, parse_class)(buf)?;
-    Ok((
-        buf,
-        InnerClasses {
-            attribute_name_index,
-            classes,
-        },
-    ))
+    Ok((buf, InnerClasses { classes }))
 }
-
+#[derive(Debug)]
 pub struct EnclosingMethodAttribute {
-    attribute_name_index: u16,
     class_index: u16,
     method_index: u16,
 }
 
 pub fn parse_enclosing_method_attribute(buf: &[u8]) -> IResult<&[u8], EnclosingMethodAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, class_index) = be_u16(buf)?;
     let (buf, method_index) = be_u16(buf)?;
     Ok((
         buf,
         EnclosingMethodAttribute {
-            attribute_name_index,
             class_index,
             method_index,
         },
     ))
 }
-
-pub struct SyntheticAttribute {
-    attribute_name_index: u16,
-}
+#[derive(Debug)]
+pub struct SyntheticAttribute {}
 
 pub fn parse_synthetic_attribute(buf: &[u8]) -> IResult<&[u8], SyntheticAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
-    Ok((
-        buf,
-        SyntheticAttribute {
-            attribute_name_index,
-        },
-    ))
+    Ok((buf, SyntheticAttribute {}))
 }
-
+#[derive(Debug)]
 pub struct SignatureAttribute {
-    attribute_name_index: u16,
     signature_index: u16,
 }
 
 pub fn parse_signature_attribute(buf: &[u8]) -> IResult<&[u8], SignatureAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, signature_index) = be_u16(buf)?;
 
-    Ok((
-        buf,
-        SignatureAttribute {
-            attribute_name_index,
-            signature_index,
-        },
-    ))
+    Ok((buf, SignatureAttribute { signature_index }))
 }
-
+#[derive(Debug)]
 pub struct SourceFileAttribute {
-    attribute_name_index: u16,
     sourcefile_index: u16,
 }
 
 pub fn parse_source_file_attribute(buf: &[u8]) -> IResult<&[u8], SourceFileAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, sourcefile_index) = be_u16(buf)?;
 
-    Ok((
-        buf,
-        SourceFileAttribute {
-            attribute_name_index,
-            sourcefile_index,
-        },
-    ))
+    Ok((buf, SourceFileAttribute { sourcefile_index }))
 }
-
+#[derive(Debug)]
 pub struct SourceDebugExtensionAttribute {
-    attribute_name_index: u16,
     debug_extension: Vec<u8>,
 }
 
 pub fn parse_source_debug_extension_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], SourceDebugExtensionAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
     let (buf, debug_extension) = length_data(be_u32)(buf)?;
 
     Ok((
         buf,
         SourceDebugExtensionAttribute {
-            attribute_name_index,
             debug_extension: debug_extension.to_vec(),
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct LineNumberTable {
     start_pc: u16,
     line_number: u16,
@@ -445,26 +378,17 @@ fn parse_line_number_table(buf: &[u8]) -> IResult<&[u8], LineNumberTable> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct LineNumberTableAttribute {
-    attribute_name_index: u16,
     line_number_table: Vec<LineNumberTable>,
 }
 
 pub fn parse_line_number_table_attribute(buf: &[u8]) -> IResult<&[u8], LineNumberTableAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, line_number_table) = length_many(be_u16, parse_line_number_table)(buf)?;
 
-    Ok((
-        buf,
-        LineNumberTableAttribute {
-            attribute_name_index,
-            line_number_table,
-        },
-    ))
+    Ok((buf, LineNumberTableAttribute { line_number_table }))
 }
-
+#[derive(Debug)]
 pub struct LocalVariableTable {
     start_pc: u16,
     length: u16,
@@ -491,28 +415,24 @@ fn parse_local_variable_table(buf: &[u8]) -> IResult<&[u8], LocalVariableTable> 
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct LocalVariableTableAttribute {
-    attribute_name_index: u16,
     local_variable_table: Vec<LocalVariableTable>,
 }
 
 pub fn parse_local_variable_table_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], LocalVariableTableAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, local_variable_table) = length_many(be_u16, parse_local_variable_table)(buf)?;
 
     Ok((
         buf,
         LocalVariableTableAttribute {
-            attribute_name_index,
             local_variable_table,
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct LocalVariableTypeTable {
     start_pc: u16,
     length: u16,
@@ -539,44 +459,31 @@ fn parse_local_variable_type_table(buf: &[u8]) -> IResult<&[u8], LocalVariableTy
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct LocalVariableTypeTableAttribute {
-    attribute_name_index: u16,
     local_variable_table: Vec<LocalVariableTypeTable>,
 }
 
 pub fn parse_local_variable_type_table_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], LocalVariableTypeTableAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, local_variable_table) = length_many(be_u16, parse_local_variable_type_table)(buf)?;
 
     Ok((
         buf,
         LocalVariableTypeTableAttribute {
-            attribute_name_index,
             local_variable_table,
         },
     ))
 }
-
-pub struct DeprecatedAttribute {
-    attribute_name_index: u16,
-}
+#[derive(Debug)]
+pub struct DeprecatedAttribute {}
 
 pub fn parse_deprecated_attribute(buf: &[u8]) -> IResult<&[u8], DeprecatedAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
-
-    Ok((
-        buf,
-        DeprecatedAttribute {
-            attribute_name_index,
-        },
-    ))
+    Ok((buf, DeprecatedAttribute {}))
 }
 
+#[derive(Debug)]
 pub enum ElementValue {
     ConstantByteIndex(u16),
     ConstantCharIndex(u16),
@@ -661,7 +568,7 @@ pub fn parse_element_value(buf: &[u8]) -> IResult<&[u8], ElementValue> {
         _ => unreachable!(),
     }
 }
-
+#[derive(Debug)]
 pub struct ElementValuePair {
     element_name_index: u16,
     value: ElementValue,
@@ -679,7 +586,7 @@ pub fn parse_element_value_pairs(buf: &[u8]) -> IResult<&[u8], ElementValuePair>
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct Annotation {
     type_index: u16,
     element_value_pairs: Vec<ElementValuePair>,
@@ -697,49 +604,31 @@ pub fn parse_annotation(buf: &[u8]) -> IResult<&[u8], Annotation> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct RuntimeVisibleAnnotationsAttribute {
-    attribute_name_index: u16,
     annotations: Vec<Annotation>,
 }
 
 pub fn parse_runtime_visible_annotations_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], RuntimeVisibleAnnotationsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, annotations) = length_many(be_u16, parse_annotation)(buf)?;
 
-    Ok((
-        buf,
-        RuntimeVisibleAnnotationsAttribute {
-            attribute_name_index,
-            annotations,
-        },
-    ))
+    Ok((buf, RuntimeVisibleAnnotationsAttribute { annotations }))
 }
-
+#[derive(Debug)]
 pub struct RuntimeInvisibleAnnotationsAttribute {
-    attribute_name_index: u16,
     annotations: Vec<Annotation>,
 }
 
 pub fn parse_runtime_invisible_annotations_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], RuntimeInvisibleAnnotationsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, annotations) = length_many(be_u16, parse_annotation)(buf)?;
 
-    Ok((
-        buf,
-        RuntimeInvisibleAnnotationsAttribute {
-            attribute_name_index,
-            annotations,
-        },
-    ))
+    Ok((buf, RuntimeInvisibleAnnotationsAttribute { annotations }))
 }
-
+#[derive(Debug)]
 pub struct ParameterAnnotation {
     annotations: Vec<Annotation>,
 }
@@ -749,49 +638,41 @@ pub fn parse_parameter_annotation(buf: &[u8]) -> IResult<&[u8], ParameterAnnotat
 
     Ok((buf, ParameterAnnotation { annotations }))
 }
-
+#[derive(Debug)]
 pub struct RuntimeVisibleParameterAnnotationsAttribute {
-    attribute_name_index: u16,
     parameter_annotations: Vec<ParameterAnnotation>,
 }
 
 pub fn parse_runtime_visible_parameter_annotations_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], RuntimeVisibleParameterAnnotationsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, parameter_annotations) = length_many(be_u16, parse_parameter_annotation)(buf)?;
 
     Ok((
         buf,
         RuntimeVisibleParameterAnnotationsAttribute {
-            attribute_name_index,
             parameter_annotations,
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct RuntimeInvisibleParameterAnnotationsAttribute {
-    attribute_name_index: u16,
     parameter_annotations: Vec<ParameterAnnotation>,
 }
 
 pub fn parse_runtime_invisible_parameter_annotations_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], RuntimeInvisibleParameterAnnotationsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, parameter_annotations) = length_many(be_u16, parse_parameter_annotation)(buf)?;
 
     Ok((
         buf,
         RuntimeInvisibleParameterAnnotationsAttribute {
-            attribute_name_index,
             parameter_annotations,
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct Table {
     start_pc: u16,
     length: u16,
@@ -813,6 +694,7 @@ pub fn parse_table(buf: &[u8]) -> IResult<&[u8], Table> {
     ))
 }
 
+#[derive(Debug)]
 pub enum TargetInfo {
     TypeParameterTarget {
         type_parameter_index: u8,
@@ -917,7 +799,7 @@ fn parse_target_info(target_type: u8, buf: &[u8]) -> IResult<&[u8], TargetInfo> 
         _ => unreachable!(),
     }
 }
-
+#[derive(Debug)]
 struct Path {
     type_path_kind: u8,
     type_argument_index: u8,
@@ -934,7 +816,7 @@ fn parse_path(buf: &[u8]) -> IResult<&[u8], Path> {
         },
     ))
 }
-
+#[derive(Debug)]
 struct TypePath {
     path: Vec<Path>,
 }
@@ -943,7 +825,7 @@ fn parse_type_path(buf: &[u8]) -> IResult<&[u8], TypePath> {
     let (buf, path) = length_many(be_u8, parse_path)(buf)?;
     Ok((buf, TypePath { path }))
 }
-
+#[derive(Debug)]
 struct TypeAnnotation {
     target_type: u8,
     target_info: TargetInfo,
@@ -969,70 +851,47 @@ fn parse_type_annotation(buf: &[u8]) -> IResult<&[u8], TypeAnnotation> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct RuntimeVisibleTypeAnnotationsAttribute {
-    attribute_name_index: u16,
     annotations: Vec<TypeAnnotation>,
 }
 
 pub fn parse_runtime_visible_type_annotations_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], RuntimeVisibleTypeAnnotationsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, annotations) = length_many(be_u16, parse_type_annotation)(buf)?;
 
-    Ok((
-        buf,
-        RuntimeVisibleTypeAnnotationsAttribute {
-            attribute_name_index,
-            annotations,
-        },
-    ))
+    Ok((buf, RuntimeVisibleTypeAnnotationsAttribute { annotations }))
 }
-
+#[derive(Debug)]
 pub struct RuntimeInvisibleTypeAnnotationsAttribute {
-    attribute_name_index: u16,
     annotations: Vec<TypeAnnotation>,
 }
 
 pub fn parse_runtime_invisible_type_annotations_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], RuntimeInvisibleTypeAnnotationsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, annotations) = length_many(be_u16, parse_type_annotation)(buf)?;
 
     Ok((
         buf,
-        RuntimeInvisibleTypeAnnotationsAttribute {
-            attribute_name_index,
-            annotations,
-        },
+        RuntimeInvisibleTypeAnnotationsAttribute { annotations },
     ))
 }
 
+#[derive(Debug)]
 pub struct AnnotationDefaultAttribute {
-    attribute_name_index: u16,
     default_value: ElementValue,
 }
 
 pub fn parse_annotation_default_attribute(
     buf: &[u8],
 ) -> IResult<&[u8], AnnotationDefaultAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
     let (buf, default_value) = parse_element_value(buf)?;
 
-    Ok((
-        buf,
-        AnnotationDefaultAttribute {
-            attribute_name_index,
-            default_value,
-        },
-    ))
+    Ok((buf, AnnotationDefaultAttribute { default_value }))
 }
-
+#[derive(Debug)]
 pub struct BootstrapMethod {
     bootstrap_method_ref: u16,
     bootstrap_arguments: Vec<u16>,
@@ -1050,26 +909,17 @@ fn parse_bootstrap_method(buf: &[u8]) -> IResult<&[u8], BootstrapMethod> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct BootstrapMethodsAttribute {
-    attribute_name_index: u16,
     bootstrap_methods: Vec<BootstrapMethod>,
 }
 
-fn parse_bootstrap_methods_attribute(buf: &[u8]) -> IResult<&[u8], BootstrapMethodsAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
+pub fn parse_bootstrap_methods_attribute(buf: &[u8]) -> IResult<&[u8], BootstrapMethodsAttribute> {
     let (buf, bootstrap_methods) = length_many(be_u16, parse_bootstrap_method)(buf)?;
 
-    Ok((
-        buf,
-        BootstrapMethodsAttribute {
-            attribute_name_index,
-            bootstrap_methods,
-        },
-    ))
+    Ok((buf, BootstrapMethodsAttribute { bootstrap_methods }))
 }
-
+#[derive(Debug)]
 pub struct Parameter {
     name_index: u16,
     access_flags: u16,
@@ -1087,22 +937,160 @@ fn parse_parameter(buf: &[u8]) -> IResult<&[u8], Parameter> {
         },
     ))
 }
-
+#[derive(Debug)]
 pub struct MethodParametersAttribute {
-    attribute_name_index: u16,
     parameters: Vec<Parameter>,
 }
 
-fn parse_method_parameters_attribute(buf: &[u8]) -> IResult<&[u8], MethodParametersAttribute> {
-    let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, attribute_length) = be_u32(buf)?;
+pub fn parse_method_parameters_attribute(buf: &[u8]) -> IResult<&[u8], MethodParametersAttribute> {
     let (buf, parameters) = length_many(be_u16, parse_parameter)(buf)?;
 
-    Ok((
-        buf,
-        MethodParametersAttribute {
-            attribute_name_index,
-            parameters,
-        },
-    ))
+    Ok((buf, MethodParametersAttribute { parameters }))
+}
+
+#[derive(Debug)]
+pub enum PredefinedAttribute {
+    ConstantValueAttribute(ConstantValueAttribute),
+    CodeAttribute(CodeAttribute),
+    StackMapTableAttribute(StackMapTableAttribute),
+    ExceptionsAttribute(ExceptionsAttribute),
+    EnclosingMethodAttribute(EnclosingMethodAttribute),
+    SyntheticAttribute(SyntheticAttribute),
+    SignatureAttribute(SignatureAttribute),
+    SourceFileAttribute(SourceFileAttribute),
+    SourceDebugExtensionAttribute(SourceDebugExtensionAttribute),
+    LineNumberTableAttribute(LineNumberTableAttribute),
+    LocalVariableTableAttribute(LocalVariableTableAttribute),
+    LocalVariableTypeTableAttribute(LocalVariableTypeTableAttribute),
+    DeprecatedAttribute(DeprecatedAttribute),
+    RuntimeVisibleAnnotationsAttribute(RuntimeVisibleAnnotationsAttribute),
+    RuntimeInvisibleAnnotationsAttribute(RuntimeInvisibleAnnotationsAttribute),
+    RuntimeVisibleParameterAnnotationsAttribute(RuntimeVisibleParameterAnnotationsAttribute),
+    RuntimeInvisibleParameterAnnotationsAttribute(RuntimeInvisibleParameterAnnotationsAttribute),
+    RuntimeVisibleTypeAnnotationsAttribute(RuntimeVisibleTypeAnnotationsAttribute),
+    RuntimeInvisibleTypeAnnotationsAttribute(RuntimeInvisibleTypeAnnotationsAttribute),
+    AnnotationDefaultAttribute(AnnotationDefaultAttribute),
+    BootstrapMethodsAttribute(BootstrapMethodsAttribute),
+    MethodParametersAttribute(MethodParametersAttribute),
+}
+
+pub fn parse_predefined_attribute<'a>(
+    attr_name: &str,
+    buf: &'a [u8],
+) -> IResult<&'a [u8], PredefinedAttribute> {
+    match attr_name {
+        "ConstantValue" => {
+            let (buf, attr) = parse_constant_value_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::ConstantValueAttribute(attr)))
+        }
+        "Code" => {
+            let (buf, attr) = parse_code_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::CodeAttribute(attr)))
+        }
+        "StackMapTable" => {
+            let (buf, attr) = parse_stack_map_table_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::StackMapTableAttribute(attr)))
+        }
+        "Exceptions" => {
+            let (buf, attr) = parse_exceptions_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::ExceptionsAttribute(attr)))
+        }
+        "EnclosingMethod" => {
+            let (buf, attr) = parse_enclosing_method_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::EnclosingMethodAttribute(attr)))
+        }
+        "Synthetic" => {
+            let (buf, attr) = parse_synthetic_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::SyntheticAttribute(attr)))
+        }
+        "Signature" => {
+            let (buf, attr) = parse_signature_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::SignatureAttribute(attr)))
+        }
+        "SourceFile" => {
+            let (buf, attr) = parse_source_file_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::SourceFileAttribute(attr)))
+        }
+        "SourceDebugExtension" => {
+            let (buf, attr) = parse_source_debug_extension_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::SourceDebugExtensionAttribute(attr),
+            ))
+        }
+        "LineNumberTable" => {
+            let (buf, attr) = parse_line_number_table_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::LineNumberTableAttribute(attr)))
+        }
+        "LocalVariableTable" => {
+            let (buf, attr) = parse_local_variable_table_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::LocalVariableTableAttribute(attr)))
+        }
+        "LocalVariableTypeTable" => {
+            let (buf, attr) = parse_local_variable_type_table_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::LocalVariableTypeTableAttribute(attr),
+            ))
+        }
+        "Deprecated" => {
+            let (buf, attr) = parse_deprecated_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::DeprecatedAttribute(attr)))
+        }
+        "RuntimeVisibleAnnotations" => {
+            let (buf, attr) = parse_runtime_visible_annotations_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::RuntimeVisibleAnnotationsAttribute(attr),
+            ))
+        }
+        "RuntimeInvisibleAnnotations" => {
+            let (buf, attr) = parse_runtime_invisible_annotations_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::RuntimeInvisibleAnnotationsAttribute(attr),
+            ))
+        }
+        "RuntimeVisibleParameterAnnotations" => {
+            let (buf, attr) = parse_runtime_visible_parameter_annotations_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::RuntimeVisibleParameterAnnotationsAttribute(attr),
+            ))
+        }
+        "RuntimeInvisibleParameterAnnotations" => {
+            let (buf, attr) = parse_runtime_invisible_parameter_annotations_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::RuntimeInvisibleParameterAnnotationsAttribute(attr),
+            ))
+        }
+        "RuntimeVisibleTypeAnnotations" => {
+            let (buf, attr) = parse_runtime_visible_type_annotations_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::RuntimeVisibleTypeAnnotationsAttribute(attr),
+            ))
+        }
+        "RuntimeInvisibleTypeAnnotations" => {
+            let (buf, attr) = parse_runtime_invisible_type_annotations_attribute(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::RuntimeInvisibleTypeAnnotationsAttribute(attr),
+            ))
+        }
+        "AnnotationDefault" => {
+            let (buf, attr) = parse_annotation_default_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::AnnotationDefaultAttribute(attr)))
+        }
+        "BootstrapMethods" => {
+            let (buf, attr) = parse_bootstrap_methods_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::BootstrapMethodsAttribute(attr)))
+        }
+        "MethodParameters" => {
+            let (buf, attr) = parse_method_parameters_attribute(buf)?;
+            Ok((buf, PredefinedAttribute::MethodParametersAttribute(attr)))
+        }
+        _ => unreachable!(),
+    }
 }

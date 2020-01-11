@@ -53,8 +53,6 @@ pub(crate) enum ConstPoolInfo {
     },
 }
 
-impl ConstPoolInfo {}
-
 pub(crate) fn parse_const_pool_info(buf: &[u8]) -> IResult<&[u8], ConstPoolInfo> {
     use ConstPoolInfo::*;
 

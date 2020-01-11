@@ -1,5 +1,9 @@
-mod predefined_attribute;
-use nom::eof;
+#[macro_use]
+pub mod predefined_attribute;
+
+use crate::class_parser::attribute_info::predefined_attribute::{
+    parse_predefined_attribute, PredefinedAttribute,
+};
 use nom::multi::length_data;
 use nom::number::complete::{be_u16, be_u32};
 use nom::IResult;
@@ -20,6 +24,12 @@ pub fn parse_attribute_info(buf: &[u8]) -> IResult<&[u8], AttributeInfo> {
             info: info.to_vec(),
         },
     ))
+}
+
+impl AttributeInfo {
+    pub fn parse_info(&self, attr_name: &str) -> PredefinedAttribute {
+        parse_predefined_attribute(attr_name, &self.info).unwrap().1
+    }
 }
 
 #[cfg(test)]

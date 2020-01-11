@@ -151,6 +151,10 @@ impl ClassFile {
         }
         Ok(())
     }
+
+    fn get_string_from_const_pool(&self, index: u16) -> &str {
+        self.constant_pool[index as usize - 1].as_constant_utf8_info()
+    }
 }
 
 fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
@@ -200,10 +204,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::class_parser::attribute_info::predefined_attribute::parse_predefined_attribute;
     use crate::class_parser::parse_class_file;
     use insta::assert_debug_snapshot;
-    use std::io::Read;
-    use std::path::PathBuf;
 
     #[test]
     fn test_parse_class_file() -> anyhow::Result<()> {
@@ -231,10 +234,10 @@ mod tests {
 
         let (buf, class) = parse_class_file(&data).expect("parse class");
         for attr in &class.attributes {
-            let s =
-                class.constant_pool[attr.attribute_name_index as usize - 1].as_constant_utf8_info();
-            dbg!(s);
+            let s = class.get_string_from_const_pool(attr.attribute_name_index);
+            dbg!(parse_predefined_attribute(s, &attr.info));
         }
+        dbg!(&class);
         assert_debug_snapshot!((buf, class));
         Ok(())
     }
