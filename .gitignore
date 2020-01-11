@@ -1,2 +1,5 @@
 /target
 **/*.rs.bk
+/Main.class
+/graph.png
+/README.html

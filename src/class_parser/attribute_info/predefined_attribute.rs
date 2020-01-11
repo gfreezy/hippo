@@ -16,10 +16,12 @@ use self::VerificationTypeInfo::{
     ObjectVariableInfo, TopVariableInfo, UninitializedThisVariableInfo, UninitializedVariableInfo,
 };
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
+use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::nom_utils::length_many;
 use nom::multi::{length_data, many_m_n};
 use nom::number::complete::{be_u16, be_u32, be_u8};
 use nom::IResult;
+
 #[derive(Debug)]
 pub struct ConstantValueAttribute {
     constant_value_index: u16,
@@ -67,7 +69,10 @@ pub struct CodeAttribute {
     attributes: Vec<AttributeInfo>,
 }
 
-pub fn parse_code_attribute(buf: &[u8]) -> IResult<&[u8], CodeAttribute> {
+pub fn parse_code_attribute<'a>(
+    const_pools: &Vec<ConstPoolInfo>,
+    buf: &'a [u8],
+) -> IResult<&'a [u8], CodeAttribute> {
     let (buf, max_stack) = be_u16(buf)?;
     let (buf, max_locals) = be_u16(buf)?;
     let (buf, code) = length_data(be_u32)(buf)?;
@@ -77,12 +82,7 @@ pub fn parse_code_attribute(buf: &[u8]) -> IResult<&[u8], CodeAttribute> {
         exception_table_length as usize,
         parse_exception_handler,
     )(buf)?;
-    let (buf, attributes_count) = be_u16(buf)?;
-    let (buf, attributes) = many_m_n(
-        attributes_count as usize,
-        attributes_count as usize,
-        parse_attribute_info,
-    )(buf)?;
+    let (buf, attributes) = length_many(be_u16, |buf| parse_attribute_info(const_pools, buf))(buf)?;
 
     Ok((
         buf,
@@ -976,6 +976,7 @@ pub enum PredefinedAttribute {
 
 pub fn parse_predefined_attribute<'a>(
     attr_name: &str,
+    const_pools: &Vec<ConstPoolInfo>,
     buf: &'a [u8],
 ) -> IResult<&'a [u8], PredefinedAttribute> {
     match attr_name {
@@ -984,7 +985,7 @@ pub fn parse_predefined_attribute<'a>(
             Ok((buf, PredefinedAttribute::ConstantValueAttribute(attr)))
         }
         "Code" => {
-            let (buf, attr) = parse_code_attribute(buf)?;
+            let (buf, attr) = parse_code_attribute(const_pools, buf)?;
             Ok((buf, PredefinedAttribute::CodeAttribute(attr)))
         }
         "StackMapTable" => {

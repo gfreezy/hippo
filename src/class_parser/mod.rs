@@ -167,9 +167,10 @@ fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     let (left, this_class) = be_u16(left)?;
     let (left, super_class) = be_u16(left)?;
     let (left, interfaces) = length_many(be_u16, be_u16)(left)?;
-    let (left, fields) = length_many(be_u16, parse_field_info)(left)?;
-    let (left, methods) = length_many(be_u16, parse_method_info)(left)?;
-    let (left, attributes) = length_many(be_u16, parse_attribute_info)(left)?;
+    let (left, fields) = length_many(be_u16, |buf| parse_field_info(&constant_pool, buf))(left)?;
+    let (left, methods) = length_many(be_u16, |buf| parse_method_info(&constant_pool, buf))(left)?;
+    let (left, attributes) =
+        length_many(be_u16, |buf| parse_attribute_info(&constant_pool, buf))(left)?;
     let (left, _) = eof!(left,)?;
 
     Ok((
@@ -204,7 +205,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::class_parser::attribute_info::predefined_attribute::parse_predefined_attribute;
     use crate::class_parser::parse_class_file;
     use insta::assert_debug_snapshot;
 
@@ -233,11 +233,6 @@ mod tests {
         ];
 
         let (buf, class) = parse_class_file(&data).expect("parse class");
-        for attr in &class.attributes {
-            let s = class.get_string_from_const_pool(attr.attribute_name_index);
-            dbg!(parse_predefined_attribute(s, &attr.info));
-        }
-        dbg!(&class);
         assert_debug_snapshot!((buf, class));
         Ok(())
     }

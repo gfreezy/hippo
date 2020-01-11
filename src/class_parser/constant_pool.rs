@@ -20,7 +20,7 @@ const CONSTANT_METHOD_TYPE: u8 = 16;
 const CONSTANT_INVOKE_DYNAMIC: u8 = 18;
 
 #[derive(Debug, EnumIsA, EnumAsGetters)]
-pub(crate) enum ConstPoolInfo {
+pub enum ConstPoolInfo {
     ConstantClassInfo {
         name_index: u16,
     },
