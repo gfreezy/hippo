@@ -16,7 +16,7 @@ use self::VerificationTypeInfo::{
     ObjectVariableInfo, TopVariableInfo, UninitializedThisVariableInfo, UninitializedVariableInfo,
 };
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
-use crate::class_parser::constant_pool::ConstPoolInfo;
+use crate::class_parser::constant_pool::ConstPool;
 use crate::nom_utils::length_many;
 use nom::multi::{length_data, many_m_n};
 use nom::number::complete::{be_u16, be_u32, be_u8};
@@ -70,7 +70,7 @@ pub struct CodeAttribute {
 }
 
 pub fn parse_code_attribute<'a>(
-    const_pools: &Vec<ConstPoolInfo>,
+    const_pool: &ConstPool,
     buf: &'a [u8],
 ) -> IResult<&'a [u8], CodeAttribute> {
     let (buf, max_stack) = be_u16(buf)?;
@@ -82,7 +82,7 @@ pub fn parse_code_attribute<'a>(
         exception_table_length as usize,
         parse_exception_handler,
     )(buf)?;
-    let (buf, attributes) = length_many(be_u16, |buf| parse_attribute_info(const_pools, buf))(buf)?;
+    let (buf, attributes) = length_many(be_u16, |buf| parse_attribute_info(const_pool, buf))(buf)?;
 
     Ok((
         buf,
@@ -976,7 +976,7 @@ pub enum PredefinedAttribute {
 
 pub fn parse_predefined_attribute<'a>(
     attr_name: &str,
-    const_pools: &Vec<ConstPoolInfo>,
+    const_pool: &ConstPool,
     buf: &'a [u8],
 ) -> IResult<&'a [u8], PredefinedAttribute> {
     match attr_name {
@@ -985,7 +985,7 @@ pub fn parse_predefined_attribute<'a>(
             Ok((buf, PredefinedAttribute::ConstantValueAttribute(attr)))
         }
         "Code" => {
-            let (buf, attr) = parse_code_attribute(const_pools, buf)?;
+            let (buf, attr) = parse_code_attribute(const_pool, buf)?;
             Ok((buf, PredefinedAttribute::CodeAttribute(attr)))
         }
         "StackMapTable" => {

@@ -4,7 +4,7 @@ pub mod predefined_attribute;
 use crate::class_parser::attribute_info::predefined_attribute::{
     parse_predefined_attribute, PredefinedAttribute,
 };
-use crate::class_parser::constant_pool::ConstPoolInfo;
+use crate::class_parser::constant_pool::ConstPool;
 use nom::number::complete::{be_u16, be_u32};
 use nom::IResult;
 
@@ -15,13 +15,13 @@ pub struct AttributeInfo {
 }
 
 pub fn parse_attribute_info<'a>(
-    const_pools: &Vec<ConstPoolInfo>,
+    const_pool: &ConstPool,
     buf: &'a [u8],
 ) -> IResult<&'a [u8], AttributeInfo> {
     let (buf, attribute_name_index) = be_u16(buf)?;
     let (buf, _length) = be_u32(buf)?;
-    let attr_name = const_pools[attribute_name_index as usize - 1].as_constant_utf8_info();
-    let (buf, attr) = parse_predefined_attribute(attr_name, const_pools, buf)?;
+    let attr_name = const_pool.get_utf8_string_at(attribute_name_index);
+    let (buf, attr) = parse_predefined_attribute(attr_name, const_pool, buf)?;
     Ok((
         buf,
         AttributeInfo {

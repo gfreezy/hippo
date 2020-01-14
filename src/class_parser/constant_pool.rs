@@ -19,6 +19,31 @@ const CONSTANT_METHOD_HANDLE: u8 = 15;
 const CONSTANT_METHOD_TYPE: u8 = 16;
 const CONSTANT_INVOKE_DYNAMIC: u8 = 18;
 
+#[derive(Debug)]
+pub struct ConstPool {
+    infos: Vec<ConstPoolInfo>,
+}
+
+impl ConstPool {
+    pub fn new(const_pool_infos: Vec<ConstPoolInfo>) -> Self {
+        ConstPool {
+            infos: const_pool_infos,
+        }
+    }
+
+    pub fn get_utf8_string_at(&self, index: u16) -> &String {
+        self.infos[index as usize - 1].as_constant_utf8_info()
+    }
+
+    pub fn get_const_pool_info_at(&self, index: u16) -> &ConstPoolInfo {
+        &self.infos[index as usize - 1]
+    }
+
+    pub fn is_class_at(&self, index: u16) -> bool {
+        self.get_const_pool_info_at(index).is_constant_class_info()
+    }
+}
+
 #[derive(Debug, EnumIsA, EnumAsGetters)]
 pub enum ConstPoolInfo {
     ConstantClassInfo {

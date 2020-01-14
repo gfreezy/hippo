@@ -4,7 +4,7 @@ pub mod field_info;
 pub mod method_info;
 
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
-use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPoolInfo};
+use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPool};
 use crate::class_parser::field_info::{parse_field_info, FieldInfo};
 use crate::class_parser::method_info::{parse_method_info, MethodInfo};
 use crate::nom_utils::length_many;
@@ -40,7 +40,7 @@ const ACC_ENUM: u16 = 0x4000;
 struct ClassFile {
     minor_version: u16,
     major_version: u16,
-    constant_pool: Vec<ConstPoolInfo>,
+    constant_pool: ConstPool,
     access_flags: u16,
     this_class: u16,
     super_class: u16,
@@ -62,7 +62,7 @@ impl ClassFile {
     pub fn new(
         minor_version: u16,
         major_version: u16,
-        constant_pool: Vec<ConstPoolInfo>,
+        constant_pool: ConstPool,
         access_flags: u16,
         this_class: u16,
         super_class: u16,
@@ -116,10 +116,7 @@ impl ClassFile {
 
     fn validate_this_class(&self) -> Result<()> {
         ensure!(
-            self.constant_pool
-                .get(self.this_class as usize)
-                .filter(|entry| entry.is_constant_class_info())
-                .is_some(),
+            self.constant_pool.is_class_at(self.this_class),
             "validate this class"
         );
         Ok(())
@@ -130,10 +127,7 @@ impl ClassFile {
             return Ok(());
         }
         ensure!(
-            self.constant_pool
-                .get(self.super_class as usize)
-                .filter(|entry| entry.is_constant_class_info())
-                .is_some(),
+            self.constant_pool.is_class_at(self.this_class),
             "validate super class"
         );
         Ok(())
@@ -142,18 +136,11 @@ impl ClassFile {
     fn validate_interfaces(&self) -> Result<()> {
         for interface in &self.interfaces {
             ensure!(
-                self.constant_pool
-                    .get(*interface as usize)
-                    .filter(|entry| entry.is_constant_class_info())
-                    .is_some(),
+                self.constant_pool.is_class_at(*interface),
                 "interface is not class"
             );
         }
         Ok(())
-    }
-
-    fn get_string_from_const_pool(&self, index: u16) -> &str {
-        self.constant_pool[index as usize - 1].as_constant_utf8_info()
     }
 }
 
@@ -162,7 +149,9 @@ fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     let (left, minor_version) = be_u16(left)?;
     let (left, major_version) = be_u16(left)?;
     let (left, constant_pool_count) = be_u16(left)?;
-    let (left, constant_pool) = parse_items(constant_pool_count, parse_const_pool_info, left)?;
+    let (left, constant_pool_infos) =
+        parse_items(constant_pool_count, parse_const_pool_info, left)?;
+    let constant_pool = ConstPool::new(constant_pool_infos);
     let (left, access_flags) = be_u16(left)?;
     let (left, this_class) = be_u16(left)?;
     let (left, super_class) = be_u16(left)?;

@@ -1,5 +1,5 @@
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
-use crate::class_parser::constant_pool::ConstPoolInfo;
+use crate::class_parser::constant_pool::ConstPool;
 use crate::nom_utils::length_many;
 use nom::number::complete::be_u16;
 use nom::IResult;
@@ -13,7 +13,7 @@ pub struct FieldInfo {
 }
 
 pub fn parse_field_info<'a>(
-    const_pools: &Vec<ConstPoolInfo>,
+    const_pools: &ConstPool,
     buf: &'a [u8],
 ) -> IResult<&'a [u8], FieldInfo> {
     let (left, access_flags) = be_u16(buf)?;
