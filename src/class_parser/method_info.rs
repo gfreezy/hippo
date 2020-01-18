@@ -1,3 +1,6 @@
+use crate::class_parser::attribute_info::predefined_attribute::{
+    CodeAttribute, PredefinedAttribute,
+};
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::nom_utils::length_many;
@@ -6,10 +9,10 @@ use nom::IResult;
 
 #[derive(Debug)]
 pub struct MethodInfo {
-    access_flags: u16,
-    name_index: u16,
-    descriptor_index: u16,
-    attributes: Vec<AttributeInfo>,
+    pub access_flags: u16,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub attributes: Vec<AttributeInfo>,
 }
 
 pub fn parse_method_info<'a>(
@@ -30,4 +33,16 @@ pub fn parse_method_info<'a>(
             attributes,
         },
     ))
+}
+
+impl MethodInfo {
+    pub fn code_attribute(self) -> CodeAttribute {
+        self.attributes
+            .into_iter()
+            .find_map(|attr| match attr.attribute {
+                PredefinedAttribute::CodeAttribute(code_attr) => Some(code_attr),
+                _ => None,
+            })
+            .unwrap()
+    }
 }

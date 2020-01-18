@@ -1,3 +1,6 @@
+use crate::class_parser::attribute_info::predefined_attribute::{
+    ConstantValueAttribute, PredefinedAttribute,
+};
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::nom_utils::length_many;
@@ -6,10 +9,10 @@ use nom::IResult;
 
 #[derive(Debug)]
 pub struct FieldInfo {
-    access_flags: u16,
-    name_index: u16,
-    descriptor_index: u16,
-    attributes: Vec<AttributeInfo>,
+    pub access_flags: u16,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub attributes: Vec<AttributeInfo>,
 }
 
 pub fn parse_field_info<'a>(
@@ -30,4 +33,13 @@ pub fn parse_field_info<'a>(
             attributes,
         },
     ))
+}
+
+impl FieldInfo {
+    pub fn constant_value_attribute(&self) -> Option<&ConstantValueAttribute> {
+        self.attributes.iter().find_map(|x| match &x.attribute {
+            PredefinedAttribute::ConstantValueAttribute(attr) => Some(attr),
+            _ => unreachable!(),
+        })
+    }
 }

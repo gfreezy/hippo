@@ -31,16 +31,23 @@ impl ConstPool {
         }
     }
 
-    pub fn get_utf8_string_at(&self, index: u16) -> &String {
-        self.infos[index as usize - 1].as_constant_utf8_info()
-    }
-
     pub fn get_const_pool_info_at(&self, index: u16) -> &ConstPoolInfo {
         &self.infos[index as usize - 1]
     }
 
+    pub fn get_utf8_string_at(&self, index: u16) -> &String {
+        self.get_const_pool_info_at(index).as_constant_utf8_info()
+    }
+
     pub fn is_class_at(&self, index: u16) -> bool {
         self.get_const_pool_info_at(index).is_constant_class_info()
+    }
+
+    pub fn get_class_name_at(&self, index: u16) -> &String {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantClassInfo { name_index } => self.get_utf8_string_at(*name_index),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -49,7 +56,15 @@ pub enum ConstPoolInfo {
     ConstantClassInfo {
         name_index: u16,
     },
-    ConstantFieldrefInfo {
+    ConstantFieldRefInfo {
+        class_index: u16,
+        name_and_type_index: u16,
+    },
+    ConstantMethodRefInfo {
+        class_index: u16,
+        name_and_type_index: u16,
+    },
+    ConstantInterfaceMethodRefInfo {
         class_index: u16,
         name_and_type_index: u16,
     },
@@ -87,12 +102,34 @@ pub(crate) fn parse_const_pool_info(buf: &[u8]) -> IResult<&[u8], ConstPoolInfo>
             let (left, name_index) = be_u16(left)?;
             Ok((left, ConstantClassInfo { name_index }))
         }
-        CONSTANT_FIELDREF | CONSTANT_METHODREF | CONSTANT_INTERFACE_METHODREF => {
+        CONSTANT_FIELDREF => {
             let (left, class_index) = be_u16(left)?;
             let (left, name_and_type_index) = be_u16(left)?;
             Ok((
                 left,
-                ConstantFieldrefInfo {
+                ConstantFieldRefInfo {
+                    class_index,
+                    name_and_type_index,
+                },
+            ))
+        }
+        CONSTANT_METHODREF => {
+            let (left, class_index) = be_u16(left)?;
+            let (left, name_and_type_index) = be_u16(left)?;
+            Ok((
+                left,
+                ConstantMethodRefInfo {
+                    class_index,
+                    name_and_type_index,
+                },
+            ))
+        }
+        CONSTANT_INTERFACE_METHODREF => {
+            let (left, class_index) = be_u16(left)?;
+            let (left, name_and_type_index) = be_u16(left)?;
+            Ok((
+                left,
+                ConstantInterfaceMethodRefInfo {
                     class_index,
                     name_and_type_index,
                 },

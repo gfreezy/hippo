@@ -18,6 +18,19 @@
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/syn-87321f7df38a54a7/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/libc-5cff9b81fbe05a5f/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/getrandom-158085164a5db07e/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/serde-c1301e91cd4bf609/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/proc-macro2-64ccc9371eea2993/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/syn-e467532d9b9d3428/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/libc-1c9761aa89b4a643/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/ryu-41ea9edee412dd44/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/getrandom-c3ba877c7bff1b26/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/nom-80b6d952e41c7caf/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/lexical-core-f334dbb0c9228728/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/arrayvec-8b4945eb5120f371/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/memchr-7bb1727ad22c6761/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/anyhow-e3d61939e107a0ef/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/bzip2-sys-a2396890f2f0462d/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/crc32fast-96d7980fe06af172/out" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

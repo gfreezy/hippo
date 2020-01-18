@@ -24,7 +24,7 @@ use nom::IResult;
 
 #[derive(Debug)]
 pub struct ConstantValueAttribute {
-    constant_value_index: u16,
+    pub constant_value_index: u16,
 }
 
 pub fn parse_constant_value_attribute(buf: &[u8]) -> IResult<&[u8], ConstantValueAttribute> {
@@ -62,11 +62,11 @@ pub fn parse_exception_handler(buf: &[u8]) -> IResult<&[u8], ExceptionHandler> {
 }
 #[derive(Debug)]
 pub struct CodeAttribute {
-    max_stack: u16,
-    max_locals: u16,
-    code: Vec<u8>,
-    exception_table: Vec<ExceptionHandler>,
-    attributes: Vec<AttributeInfo>,
+    pub max_stack: u16,
+    pub max_locals: u16,
+    pub code: Vec<u8>,
+    pub exception_table: Vec<ExceptionHandler>,
+    pub attributes: Vec<AttributeInfo>,
 }
 
 pub fn parse_code_attribute<'a>(

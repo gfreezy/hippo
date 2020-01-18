@@ -15,39 +15,39 @@ use nom::multi::many_m_n;
 use nom::number::complete::be_u16;
 use nom::IResult;
 
-const MAGIC_NUMBER: u32 = 0xCAFEBABE;
+pub const MAGIC_NUMBER: u32 = 0xCAFEBABE;
 
-const ACC_PUBLIC: u16 = 0x0001;
-const ACC_PRIVATE: u16 = 0x0002;
-const ACC_PROTECTED: u16 = 0x0004;
-const ACC_STATIC: u16 = 0x0008;
-const ACC_FINAL: u16 = 0x0010;
-const ACC_SYNCHRONIZED: u16 = 0x0020;
-const ACC_SUPER: u16 = 0x0020;
-const ACC_BRIDGE: u16 = 0x0040;
-const ACC_VOLATILE: u16 = 0x0040;
-const ACC_VARARGS: u16 = 0x0080;
-const ACC_TRANSIENT: u16 = 0x0080;
-const ACC_NATIVE: u16 = 0x0100;
-const ACC_INTERFACE: u16 = 0x0200;
-const ACC_ABSTRACT: u16 = 0x0400;
-const ACC_STRICT: u16 = 0x0800;
-const ACC_SYNTHETIC: u16 = 0x1000;
-const ACC_ANNOTATION: u16 = 0x2000;
-const ACC_ENUM: u16 = 0x4000;
+pub const ACC_PUBLIC: u16 = 0x0001;
+pub const ACC_PRIVATE: u16 = 0x0002;
+pub const ACC_PROTECTED: u16 = 0x0004;
+pub const ACC_STATIC: u16 = 0x0008;
+pub const ACC_FINAL: u16 = 0x0010;
+pub const ACC_SYNCHRONIZED: u16 = 0x0020;
+pub const ACC_SUPER: u16 = 0x0020;
+pub const ACC_BRIDGE: u16 = 0x0040;
+pub const ACC_VOLATILE: u16 = 0x0040;
+pub const ACC_VARARGS: u16 = 0x0080;
+pub const ACC_TRANSIENT: u16 = 0x0080;
+pub const ACC_NATIVE: u16 = 0x0100;
+pub const ACC_INTERFACE: u16 = 0x0200;
+pub const ACC_ABSTRACT: u16 = 0x0400;
+pub const ACC_STRICT: u16 = 0x0800;
+pub const ACC_SYNTHETIC: u16 = 0x1000;
+pub const ACC_ANNOTATION: u16 = 0x2000;
+pub const ACC_ENUM: u16 = 0x4000;
 
 #[derive(Debug)]
-struct ClassFile {
-    minor_version: u16,
-    major_version: u16,
-    constant_pool: ConstPool,
-    access_flags: u16,
-    this_class: u16,
-    super_class: u16,
-    interfaces: Vec<u16>,
-    fields: Vec<FieldInfo>,
-    methods: Vec<MethodInfo>,
-    attributes: Vec<AttributeInfo>,
+pub struct ClassFile {
+    pub minor_version: u16,
+    pub major_version: u16,
+    pub constant_pool: ConstPool,
+    pub access_flags: u16,
+    pub this_class: u16,
+    pub super_class: u16,
+    pub interfaces: Vec<u16>,
+    pub fields: Vec<FieldInfo>,
+    pub methods: Vec<MethodInfo>,
+    pub attributes: Vec<AttributeInfo>,
 }
 
 fn is_bit_set(num: u16, flag: u16) -> bool {
@@ -85,7 +85,7 @@ impl ClassFile {
         };
         class_file.validate_access_flags()?;
         class_file.validate_this_class()?;
-        //        class_file.validate_super_class()?;
+        class_file.validate_super_class()?;
         class_file.validate_interfaces()?;
 
         Ok(class_file)
@@ -144,7 +144,7 @@ impl ClassFile {
     }
 }
 
-fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
+pub fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     let (left, _) = tag(&MAGIC_NUMBER.to_be_bytes()[..])(buf)?;
     let (left, minor_version) = be_u16(left)?;
     let (left, major_version) = be_u16(left)?;
