@@ -21,7 +21,10 @@ impl ClassLoader {
         if self.classes.contains_key(&name) {
             return self.classes.get(&name).unwrap().clone();
         } else {
-            let data = self.class_path.read_class(&name).expect("read class file");
+            let data = self
+                .class_path
+                .read_class(&name)
+                .expect(&format!("read class file: {}", name));
             let class = self.define_class(data);
             self.classes.insert(name, class.clone());
             class
@@ -42,9 +45,7 @@ impl ClassLoader {
 
         let mut interfaces = Vec::with_capacity(class_file.interfaces.len());
         for interface_index in &class_file.interfaces {
-            let interface_name = class_file
-                .constant_pool
-                .get_class_name_at(super_class_index);
+            let interface_name = class_file.constant_pool.get_class_name_at(*interface_index);
             interfaces.push(self.load_class(interface_name.to_string()));
         }
 

@@ -1,6 +1,8 @@
 mod class;
 mod class_loader;
+mod code_reader;
 mod field;
+mod frame;
 mod method;
 mod opcode;
 
@@ -8,145 +10,13 @@ use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::class_path::ClassPath;
 use crate::runtime::class::Class;
 use crate::runtime::class_loader::ClassLoader;
+use crate::runtime::code_reader::CodeReader;
+use crate::runtime::frame::operand_stack::Operand;
+use crate::runtime::frame::JvmFrame;
 use crate::runtime::method::Method;
-use nom::lib::std::collections::VecDeque;
-use std::sync::Arc;
+use std::collections::VecDeque;
 
 pub type JvmPC = usize;
-
-#[derive(Debug, Clone)]
-enum Operand {
-    Int(i32),
-    Float(f32),
-    Double(f64),
-    Long(i64),
-    Str(u16),
-    ObjectRef(u16),
-    ClassRef(String),
-}
-
-#[derive(Debug)]
-struct OperandStack {
-    stack: Vec<Operand>,
-}
-
-impl OperandStack {
-    fn new() -> Self {
-        OperandStack { stack: Vec::new() }
-    }
-
-    fn with_capacity(cap: usize) -> Self {
-        OperandStack {
-            stack: Vec::with_capacity(cap),
-        }
-    }
-
-    fn push(&mut self, val: Operand) {
-        self.stack.push(val)
-    }
-
-    fn push_integer(&mut self, num: i32) {
-        self.push(Operand::Int(num))
-    }
-
-    fn push_float(&mut self, num: f32) {
-        self.push(Operand::Float(num))
-    }
-
-    fn push_object_ref(&mut self, reference: u16) {
-        self.push(Operand::ObjectRef(reference))
-    }
-
-    fn push_class_ref(&mut self, class: String) {
-        self.push(Operand::ClassRef(class))
-    }
-
-    fn pop(&mut self) -> Operand {
-        self.stack.pop().unwrap()
-    }
-
-    fn pop_integer(&mut self) -> i32 {
-        match self.stack.pop() {
-            Some(Operand::Int(num)) => num,
-            _ => unreachable!(),
-        }
-    }
-
-    fn pop_float(&mut self) -> f32 {
-        match self.stack.pop() {
-            Some(Operand::Float(num)) => num,
-            _ => unreachable!(),
-        }
-    }
-
-    fn pop_object_reference(&mut self) -> u16 {
-        match self.stack.pop() {
-            Some(Operand::ObjectRef(num)) => num,
-            _ => unreachable!(),
-        }
-    }
-
-    fn clear(&mut self) {
-        self.stack.clear();
-    }
-}
-
-#[derive(Debug)]
-struct LocalVariableArray {
-    local_variables: Vec<Operand>,
-}
-
-impl LocalVariableArray {
-    fn set_integer(&mut self, index: u16, value: i32) {
-        self.local_variables[index as usize] = Operand::Int(value);
-    }
-
-    fn get_integer(&mut self, index: u16) -> i32 {
-        match self.local_variables[index as usize] {
-            Operand::Int(num) => num,
-            _ => unreachable!(),
-        }
-    }
-
-    fn set_float(&mut self, index: u16, value: f32) {
-        self.local_variables[index as usize] = Operand::Float(value);
-    }
-
-    fn get_float(&mut self, index: u16) -> f32 {
-        match self.local_variables[index as usize] {
-            Operand::Float(num) => num,
-            _ => unreachable!(),
-        }
-    }
-
-    fn set_object_ref(&mut self, index: u16, value: u16) {
-        self.local_variables[index as usize] = Operand::ObjectRef(value);
-    }
-
-    fn get_object_ref(&mut self, index: u16) -> u16 {
-        match self.local_variables[index as usize] {
-            Operand::ObjectRef(val) => val,
-            _ => unreachable!(),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct JvmFrame {
-    local_variable_array: LocalVariableArray,
-    operand_stack: OperandStack,
-}
-
-impl JvmFrame {
-    fn new(method: &Method) -> Self {
-        JvmFrame {
-            local_variable_array: LocalVariableArray {
-                local_variables: vec![Operand::Int(0); method.max_locals()],
-            },
-            operand_stack: OperandStack::with_capacity(method.max_stack()),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct JvmStack {
@@ -163,33 +33,11 @@ pub struct JvmThread {
 pub struct JvmHeap {}
 
 #[derive(Debug)]
-struct Jvm {
+pub struct Jvm {
     heap: JvmHeap,
     thread: JvmThread,
     class_loader: ClassLoader,
     main_class: String,
-}
-
-#[derive(Debug)]
-struct CodeReader {
-    code: Arc<Vec<u8>>,
-    pc: usize,
-}
-
-impl CodeReader {
-    fn read_u8(&mut self) -> Option<u8> {
-        let code = self.code.get(self.pc as usize).cloned();
-        self.pc += 1;
-        code
-    }
-
-    fn read_u16(&mut self) -> Option<u16> {
-        let byte1 = *self.code.get(self.pc as usize)? as u16;
-        self.pc += 1;
-        let byte2 = *self.code.get(self.pc as usize)? as u16;
-        self.pc += 1;
-        Some(byte1 << 8 | byte2)
-    }
 }
 
 impl Jvm {
@@ -257,10 +105,7 @@ fn execute_method(
         }
     }
 
-    let mut code_reader = CodeReader {
-        code: method.code(),
-        pc: 0,
-    };
+    let mut code_reader = CodeReader::new(method.code());
     loop {
         let code = if let Some(code) = code_reader.read_u8() {
             code
@@ -272,6 +117,26 @@ fn execute_method(
             opcode::ICONST_0 => {
                 let frame = thread.stack.frames.back_mut().unwrap();
                 frame.operand_stack.push_integer(0);
+            }
+            opcode::ICONST_1 => {
+                let frame = thread.stack.frames.back_mut().unwrap();
+                frame.operand_stack.push_integer(1);
+            }
+            opcode::ICONST_2 => {
+                let frame = thread.stack.frames.back_mut().unwrap();
+                frame.operand_stack.push_integer(2);
+            }
+            opcode::ICONST_3 => {
+                let frame = thread.stack.frames.back_mut().unwrap();
+                frame.operand_stack.push_integer(3);
+            }
+            opcode::ICONST_4 => {
+                let frame = thread.stack.frames.back_mut().unwrap();
+                frame.operand_stack.push_integer(4);
+            }
+            opcode::ICONST_5 => {
+                let frame = thread.stack.frames.back_mut().unwrap();
+                frame.operand_stack.push_integer(5);
             }
             opcode::LDC => {
                 let frame = thread.stack.frames.back_mut().unwrap();
@@ -366,6 +231,10 @@ fn execute_method(
                     ConstPoolInfo::ConstantMethodRefInfo {
                         class_index,
                         name_and_type_index,
+                    }
+                    | ConstPoolInfo::ConstantInterfaceMethodRefInfo {
+                        class_index,
+                        name_and_type_index,
                     } => {
                         let class_name = class.constant_pool().get_class_name_at(*class_index);
                         let class = load_and_init_class(thread, class_loader, class_name.clone());
@@ -385,12 +254,6 @@ fn execute_method(
                         }
                         execute_method(thread, class_loader, class, method, Some(args));
                     }
-                    ConstPoolInfo::ConstantInterfaceMethodRefInfo {
-                        class_index,
-                        name_and_type_index,
-                    } => {
-                        // todo page 486
-                    }
                     _ => unreachable!(),
                 }
             }
@@ -407,6 +270,7 @@ fn execute_method(
                 break;
             }
             opcode::PUTSTATIC => {}
+            opcode::NOP => {}
             op @ _ => unimplemented!("{:#x}", op),
         }
     }

@@ -1,7 +1,7 @@
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{ACC_FINAL, ACC_STATIC};
-use crate::runtime::Operand;
+use crate::runtime::frame::operand_stack::Operand;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]

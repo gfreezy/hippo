@@ -51,7 +51,7 @@ impl Entry {
     fn read_class(&self, class_file_name: &str) -> Result<Vec<u8>, io::Error> {
         match self {
             Entry::Dir { path } => {
-                //                println!("read class {} using Dir", class_file_name);
+                println!("read class {} using Dir", class_file_name);
                 let filepath = Path::new(path).join(class_file_name);
                 let mut file = File::open(filepath)?;
                 let meta = file.metadata()?;
@@ -60,7 +60,7 @@ impl Entry {
                 Ok(buf)
             }
             Entry::Wildcard { path_vec } => {
-                //                println!("read class {} using Wildcard", class_file_name);
+                println!("read class {} using Wildcard", class_file_name);
                 path_vec
                     .iter()
                     .map(|x| Entry::new(x.to_str().unwrap()))
@@ -69,7 +69,7 @@ impl Entry {
                     .unwrap_or(Err(Error::new(ErrorKind::Other, "Class not found")))
             }
             Entry::Zip { path } => {
-                //                println!("read class {} using Zip", class_file_name);
+                println!("read class {} using Zip", class_file_name);
                 let file = File::open(path)?;
                 let mut zip = zip::ZipArchive::new(file)?;
                 let mut file = zip.by_name(&class_file_name)?;
