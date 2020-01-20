@@ -3,16 +3,19 @@ mod class_loader;
 mod code_reader;
 mod field;
 mod frame;
+mod instruction;
 mod method;
 mod opcode;
 
-use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::class_path::ClassPath;
 use crate::runtime::class::Class;
 use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
+use crate::runtime::instruction::{
+    iadd, iconst_n, iload_n, invokestatic, ireturn, istore, istore_n, ldc, return_,
+};
 use crate::runtime::method::Method;
 use std::collections::VecDeque;
 
@@ -96,97 +99,49 @@ fn execute_method(
 ) {
     let frame = JvmFrame::new(&method);
     thread.stack.frames.push_back(frame);
-    {
-        let frame = thread.stack.frames.back_mut().unwrap();
-        if let Some(args) = args {
-            for arg in args {
-                frame.operand_stack.push(arg)
-            }
+    let frame = thread.stack.frames.back_mut().unwrap();
+    if let Some(args) = args {
+        for arg in args {
+            frame.operand_stack.push(arg)
         }
     }
 
     let mut code_reader = CodeReader::new(method.code());
-    loop {
-        let code = if let Some(code) = code_reader.read_u8() {
-            code
-        } else {
-            break;
-        };
-
+    while let Some(code) = code_reader.read_u8() {
         match code {
             opcode::ICONST_0 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                frame.operand_stack.push_integer(0);
+                iconst_n(thread, class_loader, &mut code_reader, class.clone(), 0);
             }
             opcode::ICONST_1 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                frame.operand_stack.push_integer(1);
+                iconst_n(thread, class_loader, &mut code_reader, class.clone(), 1);
             }
             opcode::ICONST_2 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                frame.operand_stack.push_integer(2);
+                iconst_n(thread, class_loader, &mut code_reader, class.clone(), 2);
             }
             opcode::ICONST_3 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                frame.operand_stack.push_integer(3);
+                iconst_n(thread, class_loader, &mut code_reader, class.clone(), 3);
             }
             opcode::ICONST_4 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                frame.operand_stack.push_integer(4);
+                iconst_n(thread, class_loader, &mut code_reader, class.clone(), 4);
             }
             opcode::ICONST_5 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                frame.operand_stack.push_integer(5);
+                iconst_n(thread, class_loader, &mut code_reader, class.clone(), 5);
             }
-            opcode::LDC => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let index = code_reader.read_u8().unwrap();
-                let const_pool_info = class.constant_pool().get_const_pool_info_at(index as u16);
-                match const_pool_info {
-                    ConstPoolInfo::ConstantIntegerInfo(num) => {
-                        frame.operand_stack.push_integer(*num);
-                    }
-                    ConstPoolInfo::ConstantFloatInfo(num) => {
-                        frame.operand_stack.push_float(*num);
-                    }
-                    ConstPoolInfo::ConstantStringInfo { string_index } => {
-                        frame.operand_stack.push_object_ref(*string_index)
-                    }
-                    ConstPoolInfo::ConstantClassInfo { name_index } => {
-                        let name = class.constant_pool().get_utf8_string_at(*name_index);
-                        let _class = class_loader.load_class(name.clone());
-                        frame.operand_stack.push_class_ref(name.clone());
-                    }
-                    ConstPoolInfo::ConstantMethodHandleInfo { .. } => unimplemented!(),
-                    ConstPoolInfo::ConstantMethodTypeInfo { .. } => unimplemented!(),
-                    _ => unreachable!(),
-                }
-            }
+            opcode::LDC => ldc(thread, class_loader, &mut code_reader, class.clone()),
             opcode::ISTORE_0 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.operand_stack.pop_integer();
-                frame.local_variable_array.set_integer(0, val);
+                istore_n(thread, class_loader, &mut code_reader, class.clone(), 0);
             }
             opcode::ISTORE_1 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.operand_stack.pop_integer();
-                frame.local_variable_array.set_integer(1, val);
+                istore_n(thread, class_loader, &mut code_reader, class.clone(), 1);
             }
             opcode::ISTORE_2 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.operand_stack.pop_integer();
-                frame.local_variable_array.set_integer(2, val);
+                istore_n(thread, class_loader, &mut code_reader, class.clone(), 2);
             }
             opcode::ISTORE_3 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.operand_stack.pop_integer();
-                frame.local_variable_array.set_integer(3, val);
+                istore_n(thread, class_loader, &mut code_reader, class.clone(), 3);
             }
             opcode::ISTORE => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let index = code_reader.read_u8().unwrap();
-                let val = frame.operand_stack.pop_integer();
-                frame.local_variable_array.set_integer(index as u16, val);
+                istore(thread, class_loader, &mut code_reader, class.clone());
             }
             opcode::ASTORE_2 => {
                 let frame = thread.stack.frames.back_mut().unwrap();
@@ -199,74 +154,29 @@ fn execute_method(
                 frame.operand_stack.push_integer(byte as i32);
             }
             opcode::ILOAD_0 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.local_variable_array.get_integer(0);
-                frame.operand_stack.push_integer(val);
+                iload_n(thread, class_loader, &mut code_reader, class.clone(), 0);
             }
             opcode::ILOAD_1 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.local_variable_array.get_integer(1);
-                frame.operand_stack.push_integer(val);
+                iload_n(thread, class_loader, &mut code_reader, class.clone(), 1);
             }
             opcode::ILOAD_2 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.local_variable_array.get_integer(2);
-                frame.operand_stack.push_integer(val);
+                iload_n(thread, class_loader, &mut code_reader, class.clone(), 2);
             }
             opcode::ILOAD_3 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.local_variable_array.get_integer(3);
-                frame.operand_stack.push_integer(val);
+                iload_n(thread, class_loader, &mut code_reader, class.clone(), 3);
             }
             opcode::IADD => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val1 = frame.operand_stack.pop_integer();
-                let val2 = frame.operand_stack.pop_integer();
-                frame.operand_stack.push_integer(val1 + val2);
+                iadd(thread, class_loader, &mut code_reader, class.clone());
             }
             opcode::INVOKESTATIC => {
-                let index = code_reader.read_u16().unwrap();
-                let const_pool_info = class.constant_pool().get_const_pool_info_at(index);
-                match const_pool_info {
-                    ConstPoolInfo::ConstantMethodRefInfo {
-                        class_index,
-                        name_and_type_index,
-                    }
-                    | ConstPoolInfo::ConstantInterfaceMethodRefInfo {
-                        class_index,
-                        name_and_type_index,
-                    } => {
-                        let class_name = class.constant_pool().get_class_name_at(*class_index);
-                        let class = load_and_init_class(thread, class_loader, class_name.clone());
-                        let (method_name, method_type) = class
-                            .constant_pool()
-                            .get_name_and_type_at(*name_and_type_index);
-
-                        let method = class
-                            .get_user_method(method_name, method_type, true)
-                            .expect("get method");
-
-                        let frame = thread.stack.frames.back_mut().unwrap();
-                        let n_args = method.parameters().len();
-                        let mut args = Vec::with_capacity(n_args);
-                        for _ in 0..n_args {
-                            args.push(frame.operand_stack.pop());
-                        }
-                        execute_method(thread, class_loader, class, method, Some(args));
-                    }
-                    _ => unreachable!(),
-                }
+                invokestatic(thread, class_loader, &mut code_reader, class.clone());
             }
             opcode::IRETURN => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let val = frame.operand_stack.pop_integer();
-                let _ = thread.stack.frames.pop_back();
-                let last_frame = thread.stack.frames.back_mut().unwrap();
-                last_frame.operand_stack.push_integer(val);
+                ireturn(thread, class_loader, &mut code_reader, class.clone());
                 break;
             }
             opcode::RETURN => {
-                let _ = thread.stack.frames.pop_back();
+                return_(thread, class_loader, &mut code_reader, class.clone());
                 break;
             }
             opcode::PUTSTATIC => {}
