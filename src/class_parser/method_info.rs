@@ -1,5 +1,5 @@
 use crate::class_parser::attribute_info::predefined_attribute::{
-    CodeAttribute, PredefinedAttribute,
+    CodeAttribute, Parameter, PredefinedAttribute,
 };
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::ConstPool;
@@ -36,13 +36,23 @@ pub fn parse_method_info<'a>(
 }
 
 impl MethodInfo {
-    pub fn code_attribute(self) -> CodeAttribute {
+    pub fn code_attr(self) -> Option<CodeAttribute> {
         self.attributes
             .into_iter()
             .find_map(|attr| match attr.attribute {
                 PredefinedAttribute::CodeAttribute(code_attr) => Some(code_attr),
                 _ => None,
             })
-            .unwrap()
+    }
+
+    pub fn parameters(&self) -> Option<&[Parameter]> {
+        self.attributes
+            .iter()
+            .find_map(|attr| match &attr.attribute {
+                PredefinedAttribute::MethodParametersAttribute(attr) => {
+                    Some(attr.parameters.as_slice())
+                }
+                _ => None,
+            })
     }
 }

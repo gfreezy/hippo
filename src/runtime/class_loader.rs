@@ -4,14 +4,14 @@ use crate::runtime::class::Class;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct Classloader {
+pub struct ClassLoader {
     class_path: ClassPath,
     classes: HashMap<String, Class>,
 }
 
-impl Classloader {
+impl ClassLoader {
     pub fn new(class_path: ClassPath) -> Self {
-        Classloader {
+        ClassLoader {
             class_path,
             classes: Default::default(),
         }
@@ -40,6 +40,14 @@ impl Classloader {
             Some(self.load_class(super_class_name.to_string()))
         };
 
-        Class::new(class_file, super_class)
+        let mut interfaces = Vec::with_capacity(class_file.interfaces.len());
+        for interface_index in &class_file.interfaces {
+            let interface_name = class_file
+                .constant_pool
+                .get_class_name_at(super_class_index);
+            interfaces.push(self.load_class(interface_name.to_string()));
+        }
+
+        Class::new(class_file, super_class, interfaces)
     }
 }

@@ -49,6 +49,54 @@ impl ConstPool {
             _ => unreachable!(),
         }
     }
+
+    pub fn get_name_and_type_at(&self, index: u16) -> (&String, &String) {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantNameAndTypeInfo {
+                name_index,
+                descriptor_index,
+            } => (
+                self.get_utf8_string_at(*name_index),
+                self.get_utf8_string_at(*descriptor_index),
+            ),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_constant_long_at(&self, index: u16) -> i64 {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantLongInfo(num) => (*num),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_constant_float_at(&self, index: u16) -> f32 {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantFloatInfo(num) => (*num),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_constant_double_at(&self, index: u16) -> f64 {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantDoubleInfo(num) => (*num),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_constant_integer_at(&self, index: u16) -> i32 {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantIntegerInfo(num) => (*num),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_constant_string_at(&self, index: u16) -> u16 {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantStringInfo { string_index } => *string_index,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, EnumIsA, EnumAsGetters)]

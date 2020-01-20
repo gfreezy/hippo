@@ -1,6 +1,10 @@
 package Main;
 
 public class Main {
+    static int sa = 10;
+    static {
+        sa = 2;
+    }
     public static void main(String[] args) {
         int a = 1000000;
 	String x = "ssss";

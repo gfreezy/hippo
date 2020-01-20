@@ -921,8 +921,8 @@ pub fn parse_bootstrap_methods_attribute(buf: &[u8]) -> IResult<&[u8], Bootstrap
 }
 #[derive(Debug)]
 pub struct Parameter {
-    name_index: u16,
-    access_flags: u16,
+    pub name_index: u16,
+    pub access_flags: u16,
 }
 
 fn parse_parameter(buf: &[u8]) -> IResult<&[u8], Parameter> {
@@ -939,7 +939,7 @@ fn parse_parameter(buf: &[u8]) -> IResult<&[u8], Parameter> {
 }
 #[derive(Debug)]
 pub struct MethodParametersAttribute {
-    parameters: Vec<Parameter>,
+    pub parameters: Vec<Parameter>,
 }
 
 pub fn parse_method_parameters_attribute(buf: &[u8]) -> IResult<&[u8], MethodParametersAttribute> {

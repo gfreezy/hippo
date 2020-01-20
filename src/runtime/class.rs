@@ -2,11 +2,14 @@ use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::ClassFile;
 use crate::runtime::field::Field;
 use crate::runtime::method::Method;
+use nom::lib::std::collections::HashMap;
+use std::cell::Cell;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Class {
     inner: Arc<InnerClass>,
+    inited: Cell<bool>,
 }
 
 #[derive(Debug)]
@@ -14,12 +17,13 @@ struct InnerClass {
     constant_pool: ConstPool,
     access_flags: u16,
     super_class: Option<Class>,
-    fields: Vec<Field>,
+    interfaces: Vec<Class>,
+    fields: HashMap<String, Field>,
     methods: Vec<Method>,
 }
 
 impl Class {
-    pub fn new(class_file: ClassFile, super_class: Option<Class>) -> Self {
+    pub fn new(class_file: ClassFile, super_class: Option<Class>, interfaces: Vec<Class>) -> Self {
         let ClassFile {
             constant_pool,
             access_flags,
@@ -29,7 +33,10 @@ impl Class {
         } = class_file;
         let fields = field_infos
             .into_iter()
-            .map(|filed| Field::new(&constant_pool, filed))
+            .map(|filed| {
+                let f = Field::new(&constant_pool, filed);
+                (f.name().to_string(), f)
+            })
             .collect();
         let methods = method_infos
             .into_iter()
@@ -42,8 +49,18 @@ impl Class {
                 super_class,
                 fields,
                 methods,
+                interfaces,
             }),
+            inited: Cell::new(false),
         }
+    }
+
+    pub fn set_inited(&self) {
+        self.inited.replace(true);
+    }
+
+    pub fn is_inited(&self) -> bool {
+        self.inited.get()
     }
 
     pub fn constant_pool(&self) -> &ConstPool {
@@ -58,7 +75,7 @@ impl Class {
         self.inner.super_class.clone()
     }
 
-    pub fn fields(&self) -> &[Field] {
+    pub fn fields(&self) -> &HashMap<String, Field> {
         &self.inner.fields
     }
 
@@ -68,6 +85,10 @@ impl Class {
 
     pub fn main_method(&self) -> Option<Method> {
         self.get_method("main", "([Ljava/lang/String;)V", true)
+    }
+
+    pub fn cinit_method(&self) -> Method {
+        self.get_method("<clinit>", "()V", true).unwrap()
     }
 
     fn get_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
@@ -83,7 +104,19 @@ impl Class {
             .cloned()
     }
 
+    pub fn get_user_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
+        println!(
+            "name {} descriptor {} is_static {}",
+            name, descriptor, is_static
+        );
+        if name == "<init>" || name == "<clinit>" {
+            return None;
+        }
+
+        self.get_method(name, descriptor, is_static)
+    }
+
     fn get_field(&self, name: &str) -> Option<Field> {
-        self.fields().iter().find(|x| x.name() == name).cloned()
+        self.fields().get(name).cloned()
     }
 }

@@ -9,6 +9,12 @@ pub struct Method {
 }
 
 #[derive(Debug)]
+pub struct Parameter {
+    name: String,
+    access_flags: u16,
+}
+
+#[derive(Debug)]
 struct InnerMethod {
     access_flags: u16,
     name: String,
@@ -16,6 +22,7 @@ struct InnerMethod {
     max_locals: usize,
     max_stack: usize,
     code: Arc<Vec<u8>>,
+    parameters: Vec<Parameter>,
 }
 
 impl Method {
@@ -24,7 +31,18 @@ impl Method {
         let descriptor = const_pool.get_utf8_string_at(method_info.descriptor_index);
         let access_flags = method_info.access_flags;
         if access_flags & ACC_NATIVE == 0 {
-            let code_attr = method_info.code_attribute();
+            let parameters = if let Some(params) = method_info.parameters() {
+                params
+                    .into_iter()
+                    .map(|p| Parameter {
+                        name: const_pool.get_utf8_string_at(p.name_index).to_string(),
+                        access_flags: p.access_flags,
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+            let code_attr = method_info.code_attr().unwrap();
 
             Method {
                 inner: Arc::new(InnerMethod {
@@ -34,6 +52,7 @@ impl Method {
                     max_locals: code_attr.max_locals as usize,
                     max_stack: code_attr.max_stack as usize,
                     code: Arc::new(code_attr.code),
+                    parameters,
                 }),
             }
         } else {
@@ -45,6 +64,7 @@ impl Method {
                     max_locals: 0,
                     max_stack: 0,
                     code: Arc::new(vec![]),
+                    parameters: vec![],
                 }),
             }
         }
@@ -56,6 +76,10 @@ impl Method {
 
     pub fn descriptor(&self) -> &str {
         &self.inner.descriptor
+    }
+
+    pub fn parameters(&self) -> &[Parameter] {
+        &self.inner.parameters
     }
 
     pub fn name(&self) -> &str {
