@@ -1,6 +1,10 @@
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::method_info::MethodInfo;
-use crate::class_parser::{ACC_FINAL, ACC_NATIVE, ACC_STATIC};
+use crate::class_parser::{
+    ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC, ACC_STATIC,
+};
+use nom::lib::std::fmt::Formatter;
+use std::fmt;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -102,7 +106,27 @@ impl Method {
         self.access_flags() & ACC_STATIC != 0
     }
 
+    pub fn is_public(&self) -> bool {
+        self.access_flags() & ACC_PUBLIC != 0
+    }
+
+    pub fn is_private(&self) -> bool {
+        self.access_flags() & ACC_PRIVATE != 0
+    }
+
+    pub fn is_protected(&self) -> bool {
+        self.access_flags() & ACC_PROTECTED != 0
+    }
     pub fn is_final(&self) -> bool {
         self.access_flags() & ACC_FINAL != 0
+    }
+    pub fn is_abstract(&self) -> bool {
+        self.access_flags() & ACC_ABSTRACT != 0
+    }
+}
+
+impl fmt::Display for Method {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
     }
 }

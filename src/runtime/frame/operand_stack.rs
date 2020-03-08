@@ -1,5 +1,6 @@
 #[derive(Debug, Clone)]
 pub enum Operand {
+    Null,
     Int(i32),
     Float(f32),
     Double(f64),

@@ -45,7 +45,6 @@ pub struct ExceptionHandler {
 }
 
 pub fn parse_exception_handler(buf: &[u8]) -> IResult<&[u8], ExceptionHandler> {
-    let (buf, _attribute_length) = be_u32(buf)?;
     let (buf, start_pc) = be_u16(buf)?;
     let (buf, end_pc) = be_u16(buf)?;
     let (buf, handler_pc) = be_u16(buf)?;
@@ -76,12 +75,7 @@ pub fn parse_code_attribute<'a>(
     let (buf, max_stack) = be_u16(buf)?;
     let (buf, max_locals) = be_u16(buf)?;
     let (buf, code) = length_data(be_u32)(buf)?;
-    let (buf, exception_table_length) = be_u16(buf)?;
-    let (buf, exception_table) = many_m_n(
-        exception_table_length as usize,
-        exception_table_length as usize,
-        parse_exception_handler,
-    )(buf)?;
+    let (buf, exception_table) = length_many(be_u16, parse_exception_handler)(buf)?;
     let (buf, attributes) = length_many(be_u16, |buf| parse_attribute_info(const_pool, buf))(buf)?;
 
     Ok((
@@ -972,6 +966,7 @@ pub enum PredefinedAttribute {
     AnnotationDefaultAttribute(AnnotationDefaultAttribute),
     BootstrapMethodsAttribute(BootstrapMethodsAttribute),
     MethodParametersAttribute(MethodParametersAttribute),
+    InnerClassesAttribute(InnerClasses),
 }
 
 pub fn parse_predefined_attribute<'a>(
@@ -1092,6 +1087,13 @@ pub fn parse_predefined_attribute<'a>(
             let (buf, attr) = parse_method_parameters_attribute(buf)?;
             Ok((buf, PredefinedAttribute::MethodParametersAttribute(attr)))
         }
-        _ => unreachable!(),
+        "InnerClasses" => {
+            let (buf, inner_classes) = parse_inner_class(buf)?;
+            Ok((
+                buf,
+                PredefinedAttribute::InnerClassesAttribute(inner_classes),
+            ))
+        }
+        _ => unreachable!("{}", attr_name),
     }
 }

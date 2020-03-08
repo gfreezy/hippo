@@ -19,7 +19,7 @@ pub fn parse_attribute_info<'a>(
     buf: &'a [u8],
 ) -> IResult<&'a [u8], AttributeInfo> {
     let (buf, attribute_name_index) = be_u16(buf)?;
-    let (buf, _length) = be_u32(buf)?;
+    let (buf, _) = be_u32(buf)?;
     let attr_name = const_pool.get_utf8_string_at(attribute_name_index);
     let (buf, attr) = parse_predefined_attribute(attr_name, const_pool, buf)?;
     Ok((

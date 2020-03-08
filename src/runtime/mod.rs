@@ -4,6 +4,7 @@ mod code_reader;
 mod field;
 mod frame;
 mod instruction;
+mod interface;
 mod method;
 mod opcode;
 
@@ -14,10 +15,11 @@ use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
 use crate::runtime::instruction::{
-    iadd, iconst_n, iload_n, invokestatic, ireturn, istore, istore_n, ldc, return_,
+    getstatic, iadd, iconst_n, iload_n, invokestatic, ireturn, istore, istore_n, ldc, return_,
 };
 use crate::runtime::method::Method;
 use std::collections::VecDeque;
+use tracing::debug;
 
 pub type JvmPC = usize;
 
@@ -83,8 +85,10 @@ fn load_and_init_class(
 ) -> Class {
     let class = class_loader.load_class(class_name);
     if !class.is_inited() {
-        let cinit_method = class.cinit_method();
-        execute_method(thread, class_loader, class.clone(), cinit_method, None);
+        let clinit_method = class.cinit_method();
+        if let Some(clinit_method) = clinit_method {
+            execute_method(thread, class_loader, class.clone(), clinit_method, None);
+        }
     }
     class
 }
@@ -97,6 +101,8 @@ fn execute_method(
     method: Method,
     args: Option<Vec<Operand>>,
 ) {
+    let span = tracing::debug_span!("execute_method", %method, %class);
+    let _ = span.enter();
     let frame = JvmFrame::new(&method);
     thread.stack.frames.push_back(frame);
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -108,6 +114,7 @@ fn execute_method(
 
     let mut code_reader = CodeReader::new(method.code());
     while let Some(code) = code_reader.read_u8() {
+        debug!(?code);
         match code {
             opcode::ICONST_0 => {
                 iconst_n(thread, class_loader, &mut code_reader, class.clone(), 0);
@@ -179,8 +186,10 @@ fn execute_method(
                 return_(thread, class_loader, &mut code_reader, class.clone());
                 break;
             }
-            opcode::PUTSTATIC => {}
             opcode::NOP => {}
+            opcode::GETSTATIC => {
+                getstatic(thread, class_loader, &mut code_reader, class.clone());
+            }
             op @ _ => unimplemented!("{:#x}", op),
         }
     }

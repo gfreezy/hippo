@@ -12,6 +12,8 @@ nom = "5.0.1"
 cesu8 = "1.1.0"
 enum-methods = "0.0.8"
 zip = "0.5.4"
+tracing = { version = "0.1" }
+tracing-subscriber = "0.2"
 
 [dev-dependencies]
 insta = "0.12.0"

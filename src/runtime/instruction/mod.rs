@@ -4,6 +4,7 @@ use crate::runtime::class::Class;
 use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::{execute_method, load_and_init_class, JvmThread};
+use tracing::debug;
 
 pub fn iconst_n(
     thread: &mut JvmThread,
@@ -102,6 +103,8 @@ pub fn invokestatic(
 ) {
     let index = code_reader.read_u16().unwrap();
     let const_pool_info = class.constant_pool().get_const_pool_info_at(index);
+    debug!(%class, ?const_pool_info, "invokestatic");
+    let constant_pool = class.constant_pool();
     match const_pool_info {
         ConstPoolInfo::ConstantMethodRefInfo {
             class_index,
@@ -111,14 +114,13 @@ pub fn invokestatic(
             class_index,
             name_and_type_index,
         } => {
-            let class_name = class.constant_pool().get_class_name_at(*class_index);
+            let class_name = constant_pool.get_class_name_at(*class_index);
             let class = load_and_init_class(thread, class_loader, class_name.clone());
-            let (method_name, method_type) = class
-                .constant_pool()
-                .get_name_and_type_at(*name_and_type_index);
+            let (method_name, method_type) =
+                constant_pool.get_name_and_type_at(*name_and_type_index);
 
             let method = class
-                .get_user_method(method_name, method_type, true)
+                .get_self_class_method(method_name, method_type, true)
                 .expect("get method");
 
             let frame = thread.stack.frames.back_mut().unwrap();
@@ -129,7 +131,11 @@ pub fn invokestatic(
             }
             execute_method(thread, class_loader, class, method, Some(args));
         }
-        _ => unreachable!(),
+        ConstPoolInfo::ConstantClassInfo { name_index } => {
+            let class_name = constant_pool.get_utf8_string_at(*name_index);
+            panic!("{}", class_name);
+        }
+        _ => unreachable!("{:?}", const_pool_info),
     }
 }
 
@@ -153,4 +159,21 @@ pub fn return_(
     class: Class,
 ) {
     let _ = thread.stack.frames.pop_back();
+}
+
+pub fn getstatic(
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: Class,
+) {
+    let index = code_reader.read_u16().unwrap();
+    let field_ref = class.constant_pool().get_field_ref_at(index);
+    let field_class = load_and_init_class(thread, class_loader, field_ref.class_name.to_string());
+    let field = field_class
+        .get_field(field_ref.field_name, field_ref.descriptor)
+        .expect(&format!("resolve field: {:?}", field_ref));
+    let value = field.value();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push(value)
 }

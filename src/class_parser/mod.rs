@@ -50,11 +50,11 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-fn is_bit_set(num: u16, flag: u16) -> bool {
+pub fn is_bit_set(num: u16, flag: u16) -> bool {
     num & flag != 0
 }
 
-fn is_bit_clear(num: u16, flag: u16) -> bool {
+pub fn is_bit_clear(num: u16, flag: u16) -> bool {
     num & flag == 0
 }
 

@@ -28,8 +28,10 @@ impl Field {
         let descriptor = const_pool
             .get_utf8_string_at(filed_info.descriptor_index)
             .to_string();
+        tracing::debug!(%name, %descriptor);
         let value = if filed_info.access_flags & ACC_STATIC != 0
             && filed_info.access_flags & ACC_FINAL != 0
+            && constant_value_index.is_some()
         {
             let constant_value_index = constant_value_index.unwrap();
             Some(match descriptor.as_str() {
@@ -80,5 +82,13 @@ impl Field {
 
     pub fn is_final(&self) -> bool {
         self.access_flags() & ACC_FINAL != 0
+    }
+
+    pub fn value(&self) -> Operand {
+        self.inner.lock().unwrap().value.clone().unwrap()
+    }
+
+    pub fn set_value(&self, value: Operand) {
+        self.inner.lock().unwrap().value = Some(value);
     }
 }
