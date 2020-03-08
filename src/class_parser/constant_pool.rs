@@ -31,6 +31,13 @@ pub struct FieldRef<'a> {
     pub descriptor: &'a str,
 }
 
+#[derive(Debug)]
+pub struct MethodRef<'a> {
+    pub class_name: &'a str,
+    pub method_name: &'a str,
+    pub descriptor: &'a str,
+}
+
 impl ConstPool {
     pub fn new(const_pool_infos: Vec<ConstPoolInfo>) -> Self {
         ConstPool {
@@ -82,6 +89,24 @@ impl ConstPool {
                     class_name,
                     field_name: name,
                     descriptor: ty,
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_method_ref_at(&self, index: u16) -> MethodRef<'_> {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantMethodRefInfo {
+                class_index,
+                name_and_type_index,
+            } => {
+                let class_name = self.get_class_name_at(*class_index);
+                let (method_name, method_type) = self.get_name_and_type_at(*name_and_type_index);
+                MethodRef {
+                    class_name,
+                    method_name,
+                    descriptor: method_type,
                 }
             }
             _ => unreachable!(),

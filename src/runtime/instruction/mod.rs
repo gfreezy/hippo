@@ -3,6 +3,7 @@ use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::runtime::class::Class;
 use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::code_reader::CodeReader;
+use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::{execute_method, load_and_init_class, JvmThread};
 use tracing::debug;
 
@@ -115,13 +116,17 @@ pub fn invokestatic(
             name_and_type_index,
         } => {
             let class_name = constant_pool.get_class_name_at(*class_index);
+            debug!(%class_name, "get_class_name_at");
             let class = load_and_init_class(thread, class_loader, class_name.clone());
+            debug!(%class, "load_and_init_class");
             let (method_name, method_type) =
                 constant_pool.get_name_and_type_at(*name_and_type_index);
+            debug!(%method_name, %method_type, "get_name_and_type_at");
 
             let method = class
-                .get_self_class_method(method_name, method_type, true)
+                .get_method(method_name, method_type, true)
                 .expect("get method");
+            debug!(%method, "get_method");
 
             let frame = thread.stack.frames.back_mut().unwrap();
             let n_args = method.parameters().len();
@@ -176,4 +181,48 @@ pub fn getstatic(
     let value = field.value();
     let frame = thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(value)
+}
+
+pub fn putstatic(
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: Class,
+) {
+    let index = code_reader.read_u16().unwrap();
+    let field_ref = class.constant_pool().get_field_ref_at(index);
+    let field_class = load_and_init_class(thread, class_loader, field_ref.class_name.to_string());
+    let field = field_class
+        .get_field(field_ref.field_name, field_ref.descriptor)
+        .expect(&format!("resolve field: {:?}", field_ref));
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop();
+    field.set_value(value);
+}
+
+pub fn aconst_null(
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push(Operand::ObjectRef(0))
+}
+
+pub fn invokevirtual(
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: Class,
+) {
+    //todo: not finished
+    let index = code_reader.read_u16().unwrap();
+    let method_ref = class.constant_pool().get_method_ref_at(index);
+
+    let class = load_and_init_class(thread, class_loader, method_ref.class_name.to_string());
+    let method = class.get_method(method_ref.method_name, method_ref.descriptor, false);
+
+    let frame = thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push(Operand::ObjectRef(0))
 }

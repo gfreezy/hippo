@@ -4,7 +4,6 @@ mod code_reader;
 mod field;
 mod frame;
 mod instruction;
-mod interface;
 mod method;
 mod opcode;
 
@@ -14,9 +13,7 @@ use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
-use crate::runtime::instruction::{
-    getstatic, iadd, iconst_n, iload_n, invokestatic, ireturn, istore, istore_n, ldc, return_,
-};
+use crate::runtime::instruction::*;
 use crate::runtime::method::Method;
 use std::collections::VecDeque;
 use tracing::debug;
@@ -83,8 +80,11 @@ fn load_and_init_class(
     class_loader: &mut ClassLoader,
     class_name: String,
 ) -> Class {
+    tracing::debug!(%class_name, "load_and_init_class");
     let class = class_loader.load_class(class_name);
-    if !class.is_inited() {
+    if !dbg!(class.is_inited()) {
+        class.set_inited();
+        tracing::debug!(%class, "init class");
         let clinit_method = class.cinit_method();
         if let Some(clinit_method) = clinit_method {
             execute_method(thread, class_loader, class.clone(), clinit_method, None);
@@ -189,6 +189,15 @@ fn execute_method(
             opcode::NOP => {}
             opcode::GETSTATIC => {
                 getstatic(thread, class_loader, &mut code_reader, class.clone());
+            }
+            opcode::ACONST_NULL => {
+                aconst_null(thread, class_loader, &mut code_reader, class.clone());
+            }
+            opcode::PUTSTATIC => {
+                putstatic(thread, class_loader, &mut code_reader, class.clone());
+            }
+            opcode::INVOKEVIRTUAL => {
+                invokevirtual(thread, class_loader, &mut code_reader, class.clone());
             }
             op @ _ => unimplemented!("{:#x}", op),
         }
