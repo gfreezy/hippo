@@ -1,11 +1,4 @@
-= sdfsdf
+= hippo
 
-asdfasdf
-asdfasdf
+尝试用 Rust 写一个 jvm 虚拟机
 
-* hello
-* hahaha
-
-// -
-. hahsd
-. hwefsdf
