@@ -15,6 +15,7 @@ use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
 use crate::runtime::instruction::*;
 use crate::runtime::method::Method;
+use crate::runtime::opcode::show_opcode;
 use std::collections::VecDeque;
 use tracing::debug;
 
@@ -44,7 +45,7 @@ pub struct Jvm {
 
 impl Jvm {
     pub fn new(class_name: &str) -> Self {
-        let jvm = Jvm {
+        let mut jvm = Jvm {
             heap: JvmHeap {},
             thread: JvmThread {
                 stack: JvmStack {
@@ -55,6 +56,21 @@ impl Jvm {
             class_loader: ClassLoader::new(ClassPath::new(None, None)),
             main_class: class_name.to_string(),
         };
+        let system_class = load_and_init_class(
+            &mut jvm.thread,
+            &mut jvm.class_loader,
+            "java/lang/System".to_string(),
+        );
+        let system_class_initialize = system_class
+            .get_method("initializeSystemClass", "()V", true)
+            .expect("system init");
+        execute_method(
+            &mut jvm.thread,
+            &mut jvm.class_loader,
+            system_class,
+            system_class_initialize,
+            None,
+        );
         jvm
     }
 
@@ -202,7 +218,7 @@ fn execute_method(
             opcode::INVOKEVIRTUAL => {
                 invokevirtual(thread, class_loader, &mut code_reader, class.clone());
             }
-            op @ _ => unimplemented!("{:#x}", op),
+            op @ _ => unimplemented!("{}", show_opcode(op)),
         }
     }
     debug!("leave");
