@@ -28,7 +28,6 @@ impl Field {
         let descriptor = const_pool
             .get_utf8_string_at(filed_info.descriptor_index)
             .to_string();
-        tracing::debug!(%name, %descriptor);
         let value = if filed_info.access_flags & ACC_STATIC != 0
             && filed_info.access_flags & ACC_FINAL != 0
             && constant_value_index.is_some()

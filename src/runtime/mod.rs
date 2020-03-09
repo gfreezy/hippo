@@ -80,11 +80,10 @@ fn load_and_init_class(
     class_loader: &mut ClassLoader,
     class_name: String,
 ) -> Class {
-    tracing::debug!(%class_name, "load_and_init_class");
-    let class = class_loader.load_class(class_name);
-    if !dbg!(class.is_inited()) {
+    let class = class_loader.load_class(class_name.clone());
+    if !class.is_inited() {
+        debug!(%class_name, "load class");
         class.set_inited();
-        tracing::debug!(%class, "init class");
         let clinit_method = class.cinit_method();
         if let Some(clinit_method) = clinit_method {
             execute_method(thread, class_loader, class.clone(), clinit_method, None);
@@ -101,8 +100,12 @@ fn execute_method(
     method: Method,
     args: Option<Vec<Operand>>,
 ) {
-    let span = tracing::debug_span!("execute_method", %method, %class);
-    let _ = span.enter();
+    let is_native = method.is_native();
+    let span = tracing::debug_span!("execute_method", %class, %method, is_native);
+    let _span = span.enter();
+
+    debug!("enter");
+
     let frame = JvmFrame::new(&method);
     thread.stack.frames.push_back(frame);
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -114,7 +117,7 @@ fn execute_method(
 
     let mut code_reader = CodeReader::new(method.code());
     while let Some(code) = code_reader.read_u8() {
-        debug!(?code);
+        debug!("{}", opcode::show_opcode(code));
         match code {
             opcode::ICONST_0 => {
                 iconst_n(thread, class_loader, &mut code_reader, class.clone(), 0);
@@ -202,6 +205,7 @@ fn execute_method(
             op @ _ => unimplemented!("{:#x}", op),
         }
     }
+    debug!("leave");
 }
 
 #[cfg(test)]

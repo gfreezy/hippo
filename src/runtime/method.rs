@@ -1,7 +1,8 @@
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::method_info::MethodInfo;
 use crate::class_parser::{
-    ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC, ACC_STATIC,
+    is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
+    ACC_STATIC,
 };
 use nom::lib::std::fmt::Formatter;
 use std::fmt;
@@ -34,7 +35,19 @@ impl Method {
         let name = const_pool.get_utf8_string_at(method_info.name_index);
         let descriptor = const_pool.get_utf8_string_at(method_info.descriptor_index);
         let access_flags = method_info.access_flags;
-        if access_flags & ACC_NATIVE == 0 {
+        if is_bit_set(access_flags, ACC_NATIVE) || is_bit_set(access_flags, ACC_ABSTRACT) {
+            Method {
+                inner: Arc::new(InnerMethod {
+                    access_flags,
+                    name: name.to_string(),
+                    descriptor: descriptor.to_string(),
+                    max_locals: 0,
+                    max_stack: 0,
+                    code: Arc::new(vec![]),
+                    parameters: vec![],
+                }),
+            }
+        } else {
             let parameters = if let Some(params) = method_info.parameters() {
                 params
                     .into_iter()
@@ -46,7 +59,9 @@ impl Method {
             } else {
                 vec![]
             };
-            let code_attr = method_info.code_attr().unwrap();
+            let code_attr = method_info
+                .code_attr()
+                .expect(&format!("get method code attr: {}", name));
 
             Method {
                 inner: Arc::new(InnerMethod {
@@ -57,18 +72,6 @@ impl Method {
                     max_stack: code_attr.max_stack as usize,
                     code: Arc::new(code_attr.code),
                     parameters,
-                }),
-            }
-        } else {
-            Method {
-                inner: Arc::new(InnerMethod {
-                    access_flags,
-                    name: name.to_string(),
-                    descriptor: descriptor.to_string(),
-                    max_locals: 0,
-                    max_stack: 0,
-                    code: Arc::new(vec![]),
-                    parameters: vec![],
                 }),
             }
         }
@@ -104,6 +107,10 @@ impl Method {
 
     pub fn is_static(&self) -> bool {
         self.access_flags() & ACC_STATIC != 0
+    }
+
+    pub fn is_native(&self) -> bool {
+        self.access_flags() & ACC_NATIVE != 0
     }
 
     pub fn is_public(&self) -> bool {

@@ -12,7 +12,6 @@ mod runtime;
 fn main() {
     tracing_subscriber::fmt::init();
 
-    println!("hello");
     let mut jvm = Jvm::new("main/Main");
     jvm.run();
 }

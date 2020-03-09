@@ -9,7 +9,7 @@ use nom::lib::std::fmt::Formatter;
 use std::cell::Cell;
 use std::fmt;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::trace;
 
 #[derive(Debug, Clone)]
 pub struct Class {
@@ -149,7 +149,7 @@ impl Class {
                 x.is_static() == is_static && x.name() == name && x.descriptor() == descriptor
             })
             .cloned();
-        debug!(name, descriptor, is_static, ?method, "get_self_method");
+        trace!(name, descriptor, is_static, ?method, "get_self_method");
         method
     }
 
@@ -165,8 +165,6 @@ impl Class {
     }
 
     pub fn get_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
-        tracing::debug!(%name, %descriptor, is_static, "get_method");
-
         // todo: polymorphic method
         if let Some(method) = self.get_class_method(name, descriptor, is_static) {
             return Some(method);

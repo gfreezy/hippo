@@ -5,7 +5,6 @@ use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::{execute_method, load_and_init_class, JvmThread};
-use tracing::debug;
 
 pub fn iconst_n(
     thread: &mut JvmThread,
@@ -104,7 +103,6 @@ pub fn invokestatic(
 ) {
     let index = code_reader.read_u16().unwrap();
     let const_pool_info = class.constant_pool().get_const_pool_info_at(index);
-    debug!(%class, ?const_pool_info, "invokestatic");
     let constant_pool = class.constant_pool();
     match const_pool_info {
         ConstPoolInfo::ConstantMethodRefInfo {
@@ -116,17 +114,13 @@ pub fn invokestatic(
             name_and_type_index,
         } => {
             let class_name = constant_pool.get_class_name_at(*class_index);
-            debug!(%class_name, "get_class_name_at");
             let class = load_and_init_class(thread, class_loader, class_name.clone());
-            debug!(%class, "load_and_init_class");
             let (method_name, method_type) =
                 constant_pool.get_name_and_type_at(*name_and_type_index);
-            debug!(%method_name, %method_type, "get_name_and_type_at");
 
             let method = class
                 .get_method(method_name, method_type, true)
                 .expect("get method");
-            debug!(%method, "get_method");
 
             let frame = thread.stack.frames.back_mut().unwrap();
             let n_args = method.parameters().len();
