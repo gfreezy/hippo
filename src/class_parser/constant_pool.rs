@@ -113,6 +113,28 @@ impl ConstPool {
         }
     }
 
+    pub fn get_class_method_or_interface_method_at(&self, index: u16) -> MethodRef<'_> {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantMethodRefInfo {
+                class_index,
+                name_and_type_index,
+            }
+            | ConstPoolInfo::ConstantInterfaceMethodRefInfo {
+                class_index,
+                name_and_type_index,
+            } => {
+                let class_name = self.get_class_name_at(*class_index);
+                let (method_name, method_type) = self.get_name_and_type_at(*name_and_type_index);
+                MethodRef {
+                    class_name,
+                    method_name,
+                    descriptor: method_type,
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
     pub fn get_constant_long_at(&self, index: u16) -> i64 {
         match self.get_const_pool_info_at(index) {
             ConstPoolInfo::ConstantLongInfo(num) => (*num),
@@ -189,6 +211,7 @@ pub enum ConstPoolInfo {
         bootstrap_method_attr_index: u16,
         name_and_type_index: u16,
     },
+    Placeholder,
 }
 
 pub(crate) fn parse_const_pool_info(buf: &[u8]) -> IResult<&[u8], ConstPoolInfo> {
@@ -295,6 +318,6 @@ pub(crate) fn parse_const_pool_info(buf: &[u8]) -> IResult<&[u8], ConstPoolInfo>
                 },
             ))
         }
-        _ => unreachable!(),
+        o @ _ => unreachable!("{}", o),
     }
 }

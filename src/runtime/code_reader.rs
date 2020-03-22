@@ -23,4 +23,11 @@ impl CodeReader {
         self.pc += 1;
         Some(byte1 << 8 | byte2)
     }
+
+    pub fn pc(&self) -> usize {
+        self.pc
+    }
+    pub fn set_pc(&mut self, pc: usize) {
+        self.pc = pc;
+    }
 }

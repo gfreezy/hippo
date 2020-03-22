@@ -8,9 +8,28 @@ pub struct LocalVariableArray {
 impl LocalVariableArray {
     pub fn new(size: usize) -> Self {
         LocalVariableArray {
-            local_variables: vec![Operand::Int(0); size],
+            local_variables: vec![Operand::Null; size],
         }
     }
+
+    pub fn new_with_args(size: usize, args: Vec<Operand>) -> Self {
+        let mut local_variables = Vec::with_capacity(size);
+        for arg in args {
+            match arg {
+                v @ Operand::Long(_) | v @ Operand::Double(_) => {
+                    local_variables.push(v);
+                    local_variables.push(Operand::Null);
+                }
+                v @ _ => {
+                    local_variables.push(v);
+                }
+            }
+        }
+
+        local_variables.resize(size, Operand::Null);
+        LocalVariableArray { local_variables }
+    }
+
     pub fn set_integer(&mut self, index: u16, value: i32) {
         self.local_variables[index as usize] = Operand::Int(value);
     }
@@ -33,14 +52,14 @@ impl LocalVariableArray {
         }
     }
 
-    pub fn set_object_ref(&mut self, index: u16, value: u16) {
+    pub fn set_object_ref_addr(&mut self, index: u16, value: u32) {
         self.local_variables[index as usize] = Operand::ObjectRef(value);
     }
 
-    pub fn get_object_ref(&mut self, index: u16) -> u16 {
-        match self.local_variables[index as usize] {
-            Operand::ObjectRef(val) => val,
-            _ => unreachable!(),
+    pub fn get_object_ref(&mut self, index: u16) -> u32 {
+        match &self.local_variables[index as usize] {
+            Operand::ObjectRef(val) => *val,
+            v @ _ => unreachable!("{:?}", v),
         }
     }
 }

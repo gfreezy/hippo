@@ -5,8 +5,10 @@ pub enum Operand {
     Double(f64),
     Long(i64),
     Str(u16),
-    ObjectRef(u16),
+    ObjectRef(u32),
+    ArrayRef(u32),
     ClassRef(String),
+    Null,
 }
 
 #[derive(Debug)]
@@ -37,7 +39,7 @@ impl OperandStack {
         self.push(Operand::Float(num))
     }
 
-    pub fn push_object_ref(&mut self, reference: u16) {
+    pub fn push_object_ref(&mut self, reference: u32) {
         self.push(Operand::ObjectRef(reference))
     }
 
@@ -63,9 +65,16 @@ impl OperandStack {
         }
     }
 
-    pub fn pop_object_reference(&mut self) -> u16 {
+    pub fn pop_object_ref(&mut self) -> u32 {
         match self.stack.pop() {
             Some(Operand::ObjectRef(num)) => num,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn pop_array_ref(&mut self) -> u32 {
+        match self.stack.pop() {
+            Some(Operand::ArrayRef(num)) => num,
             _ => unreachable!(),
         }
     }

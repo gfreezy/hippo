@@ -1,6 +1,7 @@
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::{
     ClassFile, ACC_FINAL, ACC_INTERFACE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC, ACC_STATIC,
+    ACC_SUPER,
 };
 use crate::runtime::field::Field;
 use crate::runtime::method::Method;
@@ -53,7 +54,7 @@ impl Class {
             .collect();
         let methods = method_infos
             .into_iter()
-            .map(|method| Method::new(&constant_pool, method))
+            .map(|method| Method::new(&constant_pool, method, name.clone()))
             .collect();
         Class {
             inner: Arc::new(InnerClass {
@@ -90,6 +91,10 @@ impl Class {
         self.access_flags() & ACC_STATIC != 0
     }
 
+    pub fn is_super(&self) -> bool {
+        self.access_flags() & ACC_SUPER != 0
+    }
+
     pub fn is_public(&self) -> bool {
         self.access_flags() & ACC_PUBLIC != 0
     }
@@ -117,6 +122,10 @@ impl Class {
         self.inner.super_class.clone()
     }
 
+    pub fn iter_super_classes(&self) -> SuperClassesIter {
+        SuperClassesIter(self.clone())
+    }
+
     pub fn fields(&self) -> &HashMap<String, Field> {
         &self.inner.fields
     }
@@ -137,11 +146,11 @@ impl Class {
         self.get_self_method("main", "([Ljava/lang/String;)V", true)
     }
 
-    pub fn cinit_method(&self) -> Option<Method> {
+    pub fn clinit_method(&self) -> Option<Method> {
         self.get_self_method("<clinit>", "()V", true)
     }
 
-    fn get_self_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
+    pub fn get_self_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
         let method = self
             .methods()
             .iter()
@@ -153,8 +162,12 @@ impl Class {
         method
     }
 
-    fn get_class_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
-        assert!(self.is_class());
+    pub fn get_class_method(
+        &self,
+        name: &str,
+        descriptor: &str,
+        is_static: bool,
+    ) -> Option<Method> {
         // todo: polymorphic method
         if let Some(method) = self.get_self_method(name, descriptor, is_static) {
             return Some(method);
@@ -164,14 +177,36 @@ impl Class {
             .and_then(|super_class| super_class.get_class_method(name, descriptor, is_static))
     }
 
+    fn get_interface_method_inner(&self, name: &str, descriptor: &str) -> Option<Method> {
+        if let Some(method) = self
+            .interfaces()
+            .iter()
+            .filter_map(|interface| interface.get_interface_method(name, descriptor))
+            .filter(|method| !method.is_abstract() && !method.is_private() && !method.is_static())
+            .take(1)
+            .collect::<Vec<_>>()
+            .first()
+            .cloned()
+        {
+            return Some(method);
+        }
+
+        self.super_class()
+            .and_then(|c| c.get_interface_method(name, descriptor))
+    }
+
+    pub fn get_interface_method(&self, name: &str, descriptor: &str) -> Option<Method> {
+        if let Some(method) = self.get_self_method(name, descriptor, false) {
+            return Some(method);
+        }
+        self.get_interface_method_inner(name, descriptor)
+    }
+
     pub fn get_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
-        // todo: polymorphic method
         if let Some(method) = self.get_class_method(name, descriptor, is_static) {
             return Some(method);
         }
-        self.interfaces()
-            .iter()
-            .find_map(|interface| interface.get_interface_method(name, descriptor))
+        self.get_interface_method_inner(name, descriptor)
     }
 
     fn get_self_field(&self, name: &str, descriptor: &str) -> Option<Field> {
@@ -220,36 +255,44 @@ impl Class {
         None
     }
 
-    fn get_interface_method(&self, name: &str, descriptor: &str) -> Option<Method> {
-        assert!(self.is_interface());
-        if let Some(method) = self.get_self_method(name, descriptor, false) {
-            return Some(method);
-        }
-
-        if let Some(method) = self
-            .inner
-            .object_class
-            .as_ref()
-            .and_then(|o| o.get_method(name, descriptor, false))
-        {
-            if method.is_public() {
-                return Some(method);
+    pub fn is_subclass_of(&self, class: Class) -> bool {
+        let mut current = self.clone();
+        loop {
+            if current == class {
+                return true;
+            }
+            if let Some(klass) = current.super_class() {
+                current = klass;
+            } else {
+                break;
             }
         }
-
-        self.interfaces()
-            .iter()
-            .filter_map(|interface| interface.get_interface_method(name, descriptor))
-            .filter(|method| !method.is_abstract() && !method.is_private() && !method.is_static())
-            .take(1)
-            .collect::<Vec<_>>()
-            .first()
-            .cloned()
+        false
     }
 }
 
 impl fmt::Display for Class {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
+    }
+}
+
+impl PartialEq for Class {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name()
+    }
+}
+
+pub struct SuperClassesIter(Class);
+
+impl Iterator for SuperClassesIter {
+    type Item = Class;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let super_class = self.0.super_class();
+        if let Some(class) = super_class.clone() {
+            self.0 = class;
+        }
+        super_class
     }
 }

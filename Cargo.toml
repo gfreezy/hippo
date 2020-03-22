@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.25"
-nom = "5.0.1"
+nom = "5"
 cesu8 = "1.1.0"
 enum-methods = "0.0.8"
 zip = "0.5.4"

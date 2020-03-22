@@ -9,18 +9,18 @@ expression: "(buf, class)"
         major_version: 52,
         constant_pool: ConstPool {
             infos: [
-                ConstantFieldrefInfo {
+                ConstantMethodRefInfo {
                     class_index: 6,
                     name_and_type_index: 15,
                 },
-                ConstantFieldrefInfo {
+                ConstantFieldRefInfo {
                     class_index: 16,
                     name_and_type_index: 17,
                 },
                 ConstantStringInfo {
                     string_index: 18,
                 },
-                ConstantFieldrefInfo {
+                ConstantMethodRefInfo {
                     class_index: 19,
                     name_and_type_index: 20,
                 },

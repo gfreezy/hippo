@@ -56,6 +56,7 @@ impl Entry {
             Entry::Dir { path } => {
                 trace!("read class {} using Dir", class_file_name);
                 let filepath = Path::new(path).join(class_file_name);
+                tracing::debug!(?filepath, "read_class");
                 let mut file = File::open(filepath)?;
                 let meta = file.metadata()?;
                 let mut buf = Vec::<u8>::with_capacity(meta.len() as usize);
@@ -93,6 +94,7 @@ pub struct ClassPath {
 impl ClassPath {
     pub fn read_class(&self, name: &str) -> Result<Vec<u8>, io::Error> {
         let class_file_name = name.to_owned() + ".class";
+        tracing::debug!(%class_file_name, "read_class");
 
         self.boot
             .read_class(&class_file_name)

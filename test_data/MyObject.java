@@ -16,5 +16,4 @@ public class MyObject {
             System.out.println(myObj.instanceVar);
         }
     }
-
 }

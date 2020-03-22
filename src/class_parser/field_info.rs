@@ -39,7 +39,7 @@ impl FieldInfo {
     pub fn constant_value_attribute(&self) -> Option<&ConstantValueAttribute> {
         self.attributes.iter().find_map(|x| match &x.attribute {
             PredefinedAttribute::ConstantValueAttribute(attr) => Some(attr),
-            _ => unreachable!(),
+            _ => None,
         })
     }
 }

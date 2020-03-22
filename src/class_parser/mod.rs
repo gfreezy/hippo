@@ -1,17 +1,17 @@
 pub mod attribute_info;
 pub mod constant_pool;
+pub mod descriptor;
 pub mod field_info;
 pub mod method_info;
 
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
-use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPool};
+use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPool, ConstPoolInfo};
 use crate::class_parser::field_info::{parse_field_info, FieldInfo};
 use crate::class_parser::method_info::{parse_method_info, MethodInfo};
 use crate::nom_utils::length_many;
 use anyhow::{ensure, Result};
 use nom::bytes::complete::tag;
 use nom::eof;
-use nom::multi::many_m_n;
 use nom::number::complete::be_u16;
 use nom::IResult;
 
@@ -149,8 +149,7 @@ pub fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     let (left, minor_version) = be_u16(left)?;
     let (left, major_version) = be_u16(left)?;
     let (left, constant_pool_count) = be_u16(left)?;
-    let (left, constant_pool_infos) =
-        parse_items(constant_pool_count, parse_const_pool_info, left)?;
+    let (left, constant_pool_infos) = parse_constant_pool_infos(constant_pool_count - 1, left)?;
     let constant_pool = ConstPool::new(constant_pool_infos);
     let (left, access_flags) = be_u16(left)?;
     let (left, this_class) = be_u16(left)?;
@@ -180,25 +179,36 @@ pub fn parse_class_file(buf: &[u8]) -> IResult<&[u8], ClassFile> {
     ))
 }
 
-fn parse_items<I, O, F>(size: u16, parser: F, buf: I) -> IResult<I, Vec<O>>
-where
-    I: Clone + PartialEq,
-    F: Fn(I) -> IResult<I, O>,
-{
-    if size > 0 {
-        many_m_n(size as usize - 1, size as usize - 1, parser)(buf)
-    } else {
-        Ok((buf, Vec::new()))
+fn parse_constant_pool_infos(size: u16, mut buf: &[u8]) -> IResult<&[u8], Vec<ConstPoolInfo>> {
+    let mut real_pool = Vec::with_capacity(size as usize);
+    let mut count = 0;
+    loop {
+        if count >= size {
+            break;
+        }
+        let ret = parse_const_pool_info(buf)?;
+        buf = ret.0;
+        let item = ret.1;
+        let should_insert_placeholder = matches!(item, ConstPoolInfo::ConstantLongInfo(_) | ConstPoolInfo::ConstantDoubleInfo(_));
+        real_pool.push(item);
+        count += 1;
+        if should_insert_placeholder {
+            real_pool.push(ConstPoolInfo::Placeholder);
+            count += 1;
+        }
     }
+    Ok((buf, real_pool))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::class_parser::parse_class_file;
     use insta::assert_debug_snapshot;
+    use std::fs::File;
+    use std::io::Read;
 
     #[test]
-    fn test_parse_class_file() -> anyhow::Result<()> {
+    fn test_parse_class_file() {
         let data = [
             202, 254, 186, 190, 0, 0, 0, 52, 0, 29, 10, 0, 6, 0, 15, 9, 0, 16, 0, 17, 8, 0, 18, 10,
             0, 19, 0, 20, 7, 0, 21, 7, 0, 22, 1, 0, 6, 60, 105, 110, 105, 116, 62, 1, 0, 3, 40, 41,
@@ -223,6 +233,28 @@ mod tests {
 
         let (buf, class) = parse_class_file(&data).expect("parse class");
         assert_debug_snapshot!((buf, class));
-        Ok(())
+    }
+
+    #[test]
+    fn test_parse_java_utils_properties() {
+        let mut f = File::open("rt/java/util/Properties.class").unwrap();
+        let mut data = vec![];
+        let _ = f.read_to_end(&mut data).unwrap();
+
+        let (buf, class) = parse_class_file(&data).expect("parse class");
+        assert_debug_snapshot!((buf, class));
+    }
+
+    #[test]
+    fn test_parse_child_class() {
+        let mut f = File::open(
+            "/Users/feichao/Develop/allsunday/test-java/out/production/test-java/ITs.class",
+        )
+        .unwrap();
+        let mut data = vec![];
+        let _ = f.read_to_end(&mut data).unwrap();
+
+        let (buf, class) = parse_class_file(&data).expect("parse class");
+        assert_debug_snapshot!((buf, class));
     }
 }
