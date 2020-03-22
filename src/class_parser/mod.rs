@@ -15,7 +15,7 @@ use nom::eof;
 use nom::number::complete::be_u16;
 use nom::IResult;
 
-pub const MAGIC_NUMBER: u32 = 0xCAFEBABE;
+pub const MAGIC_NUMBER: u32 = 0xCAFE_BABE;
 
 pub const ACC_PUBLIC: u16 = 0x0001;
 pub const ACC_PRIVATE: u16 = 0x0002;

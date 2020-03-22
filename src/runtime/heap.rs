@@ -96,7 +96,7 @@ impl JvmHeap {
                 Memory::CharArray(array) => array,
                 _ => unreachable!(),
             },
-            v @ _ => unreachable!("{:?}", v),
+            v => unreachable!("{:?}", v),
         }
     }
     pub fn get_mut_int_array(&mut self, array_ref: Operand) -> &mut Vec<i32> {

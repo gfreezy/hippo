@@ -20,11 +20,10 @@ impl ClassLoader {
 
     pub(super) fn load_class(&mut self, name: &str) -> Class {
         if self.classes.contains_key(name) {
-            return self
-                .classes
+            self.classes
                 .get(name)
                 .expect(&format!("get class: {}", name))
-                .clone();
+                .clone()
         } else {
             debug!(%name, "load_class");
             let data = self

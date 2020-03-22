@@ -422,7 +422,7 @@ pub fn invokespecial(
         args.push(frame.operand_stack.pop());
     }
     let object_ref = frame.operand_stack.pop();
-    args.push(object_ref.clone());
+    args.push(object_ref);
     args.reverse();
 
     if !actual_method.is_native() {

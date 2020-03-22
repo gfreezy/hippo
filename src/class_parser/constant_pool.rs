@@ -318,6 +318,6 @@ pub(crate) fn parse_const_pool_info(buf: &[u8]) -> IResult<&[u8], ConstPoolInfo>
                 },
             ))
         }
-        o @ _ => unreachable!("{}", o),
+        o => unreachable!("{}", o),
     }
 }

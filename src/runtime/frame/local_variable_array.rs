@@ -20,7 +20,7 @@ impl LocalVariableArray {
                     local_variables.push(v);
                     local_variables.push(Operand::Null);
                 }
-                v @ _ => {
+                v => {
                     local_variables.push(v);
                 }
             }
@@ -59,7 +59,7 @@ impl LocalVariableArray {
     pub fn get_object_ref(&mut self, index: u16) -> u32 {
         match &self.local_variables[index as usize] {
             Operand::ObjectRef(val) => *val,
-            v @ _ => unreachable!("{:?}", v),
+            v => unreachable!("{:?}", v),
         }
     }
 }

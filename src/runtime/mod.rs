@@ -452,11 +452,11 @@ fn execute_method(
                 invokestatic(heap, thread, class_loader, &mut code_reader, class.clone());
             }
             opcode::IRETURN => {
-                ireturn(heap, thread, class_loader, &mut code_reader, class.clone());
+                ireturn(heap, thread, class_loader, &mut code_reader, class);
                 break;
             }
             opcode::RETURN => {
-                return_(heap, thread, class_loader, &mut code_reader, class.clone());
+                return_(heap, thread, class_loader, &mut code_reader, class);
                 break;
             }
             opcode::NOP => {}
@@ -502,7 +502,7 @@ fn execute_method(
             opcode::ANEWARRAY => {
                 anewarray(heap, thread, class_loader, &mut code_reader, class.clone());
             }
-            op @ _ => unimplemented!("{}", show_opcode(op)),
+            op => unimplemented!("{}", show_opcode(op)),
         }
     }
 }
