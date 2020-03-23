@@ -163,20 +163,22 @@ fn execute_method(
 
     if is_native {
         let frame = thread.stack.frames.back().unwrap();
-        match (method.name(), method.descriptor()) {
-            ("", "(Ljava/lang/String;)Ljava/lang/Class;") => {
-                let val =
-                    java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
-                frame.operand_stack.push()
-            }
-        };
-
         debug!(
             ?frame,
             ?args,
             descriptor = method.descriptor(),
             "skip native method"
         );
+        match (method.name(), method.descriptor()) {
+            ("getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;") => {
+                let val =
+                    java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
+                dbg!(val);
+                // frame.operand_stack.push()
+            }
+            _ => {}
+        };
+
         if method.return_descriptor() != "V" {
             panic!("native method returns {}", method.return_descriptor());
         }
@@ -196,138 +198,47 @@ fn execute_method(
         );
         match code {
             opcode::ICONST_0 => {
-                iconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    0,
-                );
+                iconst_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
             opcode::ICONST_1 => {
-                iconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    1,
-                );
+                iconst_n(heap, thread, class_loader, &mut code_reader, &class, 1);
             }
             opcode::ICONST_2 => {
-                iconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    2,
-                );
+                iconst_n(heap, thread, class_loader, &mut code_reader, &class, 2);
             }
             opcode::ICONST_3 => {
-                iconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    3,
-                );
+                iconst_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
             opcode::ICONST_4 => {
-                iconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    4,
-                );
+                iconst_n(heap, thread, class_loader, &mut code_reader, &class, 4);
             }
             opcode::ICONST_5 => {
-                iconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    5,
-                );
+                iconst_n(heap, thread, class_loader, &mut code_reader, &class, 5);
             }
             opcode::FCONST_0 => {
-                fconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    0.0,
-                );
+                fconst_n(heap, thread, class_loader, &mut code_reader, &class, 0.0);
             }
             opcode::FCONST_1 => {
-                fconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    1.0,
-                );
+                fconst_n(heap, thread, class_loader, &mut code_reader, &class, 1.0);
             }
             opcode::FCONST_2 => {
-                fconst_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    2.0,
-                );
+                fconst_n(heap, thread, class_loader, &mut code_reader, &class, 2.0);
             }
-            opcode::LDC => ldc(heap, thread, class_loader, &mut code_reader, class.clone()),
+            opcode::LDC => ldc(heap, thread, class_loader, &mut code_reader, &class),
             opcode::ISTORE_0 => {
-                istore_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    0,
-                );
+                istore_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
             opcode::ISTORE_1 => {
-                istore_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    1,
-                );
+                istore_n(heap, thread, class_loader, &mut code_reader, &class, 1);
             }
             opcode::ISTORE_2 => {
-                istore_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    2,
-                );
+                istore_n(heap, thread, class_loader, &mut code_reader, &class, 2);
             }
             opcode::ISTORE_3 => {
-                istore_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    3,
-                );
+                istore_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
             opcode::ISTORE => {
-                istore(heap, thread, class_loader, &mut code_reader, class.clone());
+                istore(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::ASTORE_2 => {
                 let frame = thread.stack.frames.back_mut().unwrap();
@@ -342,181 +253,97 @@ fn execute_method(
                 frame.operand_stack.push_integer(byte as i32);
             }
             opcode::ILOAD_0 => {
-                iload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    0,
-                );
+                iload_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
             opcode::ILOAD_1 => {
-                iload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    1,
-                );
+                iload_n(heap, thread, class_loader, &mut code_reader, &class, 1);
             }
             opcode::ILOAD_2 => {
-                iload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    2,
-                );
+                iload_n(heap, thread, class_loader, &mut code_reader, &class, 2);
             }
             opcode::ILOAD_3 => {
-                iload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    3,
-                );
+                iload_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
             opcode::ALOAD_0 => {
-                aload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    0,
-                );
+                aload_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
             opcode::ALOAD_1 => {
-                aload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    1,
-                );
+                aload_n(heap, thread, class_loader, &mut code_reader, &class, 1);
             }
             opcode::ALOAD_2 => {
-                aload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    2,
-                );
+                aload_n(heap, thread, class_loader, &mut code_reader, &class, 2);
             }
             opcode::ALOAD_3 => {
-                aload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    3,
-                );
+                aload_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
             opcode::FLOAD_0 => {
-                fload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    0,
-                );
+                fload_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
             opcode::FLOAD_1 => {
-                fload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    1,
-                );
+                fload_n(heap, thread, class_loader, &mut code_reader, &class, 1);
             }
             opcode::FLOAD_2 => {
-                fload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    2,
-                );
+                fload_n(heap, thread, class_loader, &mut code_reader, &class, 2);
             }
             opcode::FLOAD_3 => {
-                fload_n(
-                    heap,
-                    thread,
-                    class_loader,
-                    &mut code_reader,
-                    class.clone(),
-                    3,
-                );
+                fload_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
             opcode::IADD => {
-                iadd(heap, thread, class_loader, &mut code_reader, class.clone());
+                iadd(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::INVOKESTATIC => {
-                invokestatic(heap, thread, class_loader, &mut code_reader, class.clone());
+                invokestatic(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::IRETURN => {
-                ireturn(heap, thread, class_loader, &mut code_reader, class);
+                ireturn(heap, thread, class_loader, &mut code_reader, &class);
                 break;
             }
             opcode::RETURN => {
-                return_(heap, thread, class_loader, &mut code_reader, class);
+                return_(heap, thread, class_loader, &mut code_reader, &class);
                 break;
             }
             opcode::NOP => {}
             opcode::GETSTATIC => {
-                getstatic(heap, thread, class_loader, &mut code_reader, class.clone());
+                getstatic(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::ACONST_NULL => {
-                aconst_null(heap, thread, class_loader, &mut code_reader, class.clone());
+                aconst_null(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::PUTSTATIC => {
-                putstatic(heap, thread, class_loader, &mut code_reader, class.clone());
+                putstatic(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::INVOKEVIRTUAL => {
-                invokevirtual(heap, thread, class_loader, &mut code_reader, class.clone());
+                invokevirtual(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::NEW => {
-                new(heap, thread, class_loader, &mut code_reader, class.clone());
+                new(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::NEWARRAY => {
-                newarray(heap, thread, class_loader, &mut code_reader, class.clone());
+                newarray(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::DUP => {
-                dup(heap, thread, class_loader, &mut code_reader, class.clone());
+                dup(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::CASTORE => {
-                castore(heap, thread, class_loader, &mut code_reader, class.clone());
+                castore(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::INVOKESPECIAL => {
-                invokespecial(heap, thread, class_loader, &mut code_reader, class.clone());
+                invokespecial(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::PUTFIELD => {
-                putfield(heap, thread, class_loader, &mut code_reader, class.clone());
+                putfield(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::IFGE => {
-                ifge(heap, thread, class_loader, &mut code_reader, class.clone());
+                ifge(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::IFLE => {
-                ifle(heap, thread, class_loader, &mut code_reader, class.clone());
+                ifle(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::FCMPG | opcode::FCMPL => {
-                fcmpg(heap, thread, class_loader, &mut code_reader, class.clone());
+                fcmpg(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::ANEWARRAY => {
-                anewarray(heap, thread, class_loader, &mut code_reader, class.clone());
+                anewarray(heap, thread, class_loader, &mut code_reader, &class);
             }
             op => unimplemented!("{}", show_opcode(op)),
         }

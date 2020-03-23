@@ -13,7 +13,7 @@ pub fn iconst_n(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -25,7 +25,7 @@ pub fn fconst_n(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
     n: f32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -37,7 +37,7 @@ pub fn ldc(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let index = code_reader.read_u8().unwrap();
@@ -50,6 +50,7 @@ pub fn ldc(
             frame.operand_stack.push_float(*num);
         }
         ConstPoolInfo::ConstantStringInfo { string_index } => {
+            // todo: to fix this, string
             frame.operand_stack.push_object_ref(*string_index as u32)
         }
         ConstPoolInfo::ConstantClassInfo { name_index } => {
@@ -68,7 +69,7 @@ pub fn istore_n(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -81,7 +82,7 @@ pub fn istore(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let index = code_reader.read_u8().unwrap();
@@ -94,7 +95,7 @@ pub fn iload_n(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -107,7 +108,7 @@ pub fn aload_n(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -120,7 +121,7 @@ pub fn fload_n(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
@@ -132,7 +133,7 @@ pub fn iadd(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
@@ -145,7 +146,7 @@ pub fn invokestatic(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let method_ref = class
@@ -173,7 +174,7 @@ pub fn ireturn(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop_integer();
@@ -187,7 +188,7 @@ pub fn return_(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let _ = thread.stack.frames.pop_back();
 }
@@ -197,7 +198,7 @@ pub fn getstatic(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let field_ref = class.constant_pool().get_field_ref_at(index);
@@ -215,7 +216,7 @@ pub fn putstatic(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let field_ref = class.constant_pool().get_field_ref_at(index);
@@ -233,7 +234,7 @@ pub fn aconst_null(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::ObjectRef(0))
@@ -244,7 +245,7 @@ pub fn invokevirtual(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let method_ref = class.constant_pool().get_method_ref_at(index);
@@ -312,7 +313,7 @@ pub fn new(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
@@ -327,7 +328,7 @@ pub fn newarray(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let count = frame.operand_stack.pop_integer();
@@ -341,7 +342,7 @@ pub fn anewarray(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let count = frame.operand_stack.pop_integer();
@@ -356,7 +357,7 @@ pub fn dup(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop();
@@ -369,7 +370,7 @@ pub fn castore(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop_integer();
@@ -384,7 +385,7 @@ pub fn invokespecial(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let method_ref = class
@@ -437,7 +438,7 @@ pub fn putfield(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let index = code_reader.read_u16().unwrap();
     let field_ref = class.constant_pool().get_field_ref_at(index);
@@ -453,7 +454,7 @@ pub fn ifge(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let pc = code_reader.pc();
     let offset = code_reader.read_u16().unwrap();
@@ -469,7 +470,7 @@ pub fn ifle(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let pc = code_reader.pc();
     let offset = code_reader.read_u16().unwrap();
@@ -485,7 +486,7 @@ pub fn fcmpg(
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
     code_reader: &mut CodeReader,
-    class: Class,
+    class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_float();
