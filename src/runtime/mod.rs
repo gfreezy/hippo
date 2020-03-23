@@ -6,6 +6,7 @@ mod frame;
 mod heap;
 mod instruction;
 mod method;
+mod native;
 mod opcode;
 
 use crate::class_path::ClassPath;
@@ -17,6 +18,7 @@ use crate::runtime::frame::JvmFrame;
 use crate::runtime::heap::JvmHeap;
 use crate::runtime::instruction::*;
 use crate::runtime::method::Method;
+use crate::runtime::native::java_java_lang_Class_getPrimitiveClass;
 use crate::runtime::opcode::show_opcode;
 use std::collections::VecDeque;
 use tracing::{debug, debug_span};
@@ -160,7 +162,21 @@ fn execute_method(
     let _span = span.enter();
 
     if is_native {
-        debug!("skip native method");
+        let frame = thread.stack.frames.back().unwrap();
+        match (method.name(), method.descriptor()) {
+            ("", "(Ljava/lang/String;)Ljava/lang/Class;") => {
+                let val =
+                    java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
+                frame.operand_stack.push()
+            }
+        };
+
+        debug!(
+            ?frame,
+            ?args,
+            descriptor = method.descriptor(),
+            "skip native method"
+        );
         if method.return_descriptor() != "V" {
             panic!("native method returns {}", method.return_descriptor());
         }

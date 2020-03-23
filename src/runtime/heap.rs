@@ -44,6 +44,10 @@ impl Object {
     pub fn set_field(&mut self, field_name: String, value: Operand) {
         self.fields.insert(field_name, value);
     }
+
+    pub fn get_field(&self, field_name: &str) -> Option<&Operand> {
+        self.fields.get(field_name)
+    }
 }
 
 impl JvmHeap {
@@ -99,6 +103,17 @@ impl JvmHeap {
             v => unreachable!("{:?}", v),
         }
     }
+
+    pub fn get_char_array(&self, array_ref: &Operand) -> &Vec<u16> {
+        match array_ref {
+            Operand::ArrayRef(ref_i) => match &self.mem[*ref_i as usize] {
+                Memory::CharArray(array) => array,
+                _ => unreachable!(),
+            },
+            v => unreachable!("{:?}", v),
+        }
+    }
+
     pub fn get_mut_int_array(&mut self, array_ref: Operand) -> &mut Vec<i32> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
@@ -162,6 +177,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
+
     pub fn get_mut_object(&mut self, obj_ref: Operand) -> &mut Object {
         match obj_ref {
             Operand::ObjectRef(ref_i) => match &mut self.mem[ref_i as usize] {
@@ -170,5 +186,21 @@ impl JvmHeap {
             },
             _ => unreachable!(),
         }
+    }
+
+    pub fn get_object(&self, obj_ref: &Operand) -> &Object {
+        match obj_ref {
+            Operand::ObjectRef(ref_i) => match &self.mem[*ref_i as usize] {
+                Memory::Object(obj) => obj,
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_string(&self, str_ref: &Operand) -> String {
+        let string_operand = self.get_object(str_ref);
+        let chars_ref = string_operand.get_field("value").unwrap();
+        String::from_utf16(self.get_char_array(chars_ref)).unwrap()
     }
 }
