@@ -56,9 +56,9 @@ impl LocalVariableArray {
         self.local_variables[index as usize] = Operand::ObjectRef(value);
     }
 
-    pub fn get_object_ref(&mut self, index: u16) -> u32 {
+    pub fn get_object(&mut self, index: u16) -> Operand {
         match &self.local_variables[index as usize] {
-            Operand::ObjectRef(val) => *val,
+            v @ Operand::ObjectRef(_) => v.clone(),
             v => unreachable!("{:?}", v),
         }
     }

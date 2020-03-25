@@ -50,13 +50,14 @@ pub fn ldc(
             frame.operand_stack.push_float(*num);
         }
         ConstPoolInfo::ConstantStringInfo { string_index } => {
-            // todo: to fix this, string
-            frame.operand_stack.push_object_ref(*string_index as u32)
+            let s = class.constant_pool().get_utf8_string_at(*string_index);
+            let str_ref = heap.new_java_string(s);
+            frame.operand_stack.push_object_ref(str_ref)
         }
         ConstPoolInfo::ConstantClassInfo { name_index } => {
             let name = class.constant_pool().get_utf8_string_at(*name_index);
-            let _class = class_loader.load_class(name);
-            frame.operand_stack.push_class_ref(name.clone());
+            let obj_ref = heap.new_class_object(name.clone());
+            frame.operand_stack.push_object_ref(obj_ref);
         }
         ConstPoolInfo::ConstantMethodHandleInfo { .. } => unimplemented!(),
         ConstPoolInfo::ConstantMethodTypeInfo { .. } => unimplemented!(),
@@ -112,8 +113,8 @@ pub fn aload_n(
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
-    let val = frame.local_variable_array.get_object_ref(n as u16);
-    frame.operand_stack.push_object_ref(val);
+    let val = frame.local_variable_array.get_object(n as u16);
+    frame.operand_stack.push(val);
 }
 
 pub fn fload_n(
@@ -270,8 +271,13 @@ pub fn invokevirtual(
     args.push(object_ref.clone());
     args.reverse();
 
-    let class_name = heap.get_mut_object(object_ref).class_name().to_string();
+    let class_name = heap.get_class_name(&object_ref).to_string();
     let object_class = load_and_init_class(heap, thread, class_loader, &class_name);
+
+    if resolved_method.is_native() {
+        execute_method(heap, thread, class_loader, resolved_method, args);
+        return;
+    }
 
     let acutal_method = if !resolved_method.is_signature_polymorphic() {
         if let Some(actual_method) = object_class
@@ -298,14 +304,9 @@ pub fn invokevirtual(
         unimplemented!("is_signature_polymorphic")
     };
 
-    if !acutal_method.is_native() {
-        let actual_class =
-            load_and_init_class(heap, thread, class_loader, acutal_method.class_name());
+    let actual_class = load_and_init_class(heap, thread, class_loader, acutal_method.class_name());
 
-        execute_method(heap, thread, class_loader, acutal_method, args);
-    } else {
-        debug!(method = ?resolved_method, class = %class_name, "invokevirtual")
-    }
+    execute_method(heap, thread, class_loader, acutal_method, args);
 }
 
 pub fn new(
@@ -317,8 +318,7 @@ pub fn new(
 ) {
     let index = code_reader.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
-    let class = load_and_init_class(heap, thread, class_loader, class_name);
-    let object_ref = heap.new_object(class);
+    let object_ref = heap.new_object(class_name.clone());
     let frame = thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::ObjectRef(object_ref))
 }
@@ -449,6 +449,23 @@ pub fn putfield(
     object.set_field(field_ref.field_name.to_string(), value);
 }
 
+pub fn getfield(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let index = code_reader.read_u16().unwrap();
+    let field_ref = class.constant_pool().get_field_ref_at(index);
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let object_ref = frame.operand_stack.pop();
+    debug!(?field_ref, "getfield");
+    let object = heap.get_object(&object_ref);
+    let v = object.get_field(field_ref.field_name).unwrap();
+    frame.operand_stack.push(v.clone());
+}
+
 pub fn ifge(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -479,6 +496,63 @@ pub fn ifle(
     if value <= 0 {
         code_reader.set_pc(pc - 1 + offset as usize);
     }
+}
+
+pub fn ifeq(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop_integer();
+    if value == 0 {
+        code_reader.set_pc(pc - 1 + offset as usize);
+    }
+}
+
+pub fn ifne(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop_integer();
+    if value != 0 {
+        code_reader.set_pc(pc - 1 + offset as usize);
+    }
+}
+
+pub fn i2f(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop_integer();
+    frame.operand_stack.push_float(value as f32);
+}
+
+pub fn fmul(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value2 = frame.operand_stack.pop_float();
+    let value1 = frame.operand_stack.pop_float();
+    frame.operand_stack.push_float(value1 * value2);
 }
 
 pub fn fcmpg(

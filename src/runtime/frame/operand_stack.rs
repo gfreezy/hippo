@@ -7,7 +7,6 @@ pub enum Operand {
     Str(u16),
     ObjectRef(u32),
     ArrayRef(u32),
-    ClassRef(String),
     Null,
 }
 
@@ -41,10 +40,6 @@ impl OperandStack {
 
     pub fn push_object_ref(&mut self, reference: u32) {
         self.push(Operand::ObjectRef(reference))
-    }
-
-    pub fn push_class_ref(&mut self, class: String) {
-        self.push(Operand::ClassRef(class))
     }
 
     pub fn pop(&mut self) -> Operand {

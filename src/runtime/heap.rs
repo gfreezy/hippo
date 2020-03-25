@@ -16,6 +16,9 @@ const T_SHORT: u8 = 9;
 const T_INT: u8 = 10;
 const T_LONG: u8 = 11;
 
+const CLASS_CLASS_NAME: &str = "java/lang/Class";
+const STRING_CLASS_NAME: &str = "java/lang/String";
+
 #[derive(Debug)]
 enum Memory {
     Object(Object),
@@ -31,22 +34,50 @@ enum Memory {
 }
 
 #[derive(Debug)]
-pub struct Object {
-    class_name: String,
-    fields: HashMap<String, Operand>,
+pub enum Object {
+    Class {
+        class_name: String,
+    },
+    Object {
+        class_name: String,
+        fields: HashMap<String, Operand>,
+    },
 }
 
 impl Object {
+    pub fn new_object(class_name: String) -> Self {
+        Object::Object {
+            class_name,
+            fields: HashMap::new(),
+        }
+    }
+    pub fn new_object_with_fields(class_name: String, fields: HashMap<String, Operand>) -> Self {
+        Object::Object { class_name, fields }
+    }
+
+    pub fn new_class(class_name: String) -> Self {
+        Object::Class { class_name }
+    }
+
     pub fn class_name(&self) -> &str {
-        &self.class_name
+        match self {
+            Object::Class { .. } => CLASS_CLASS_NAME,
+            Object::Object { class_name, .. } => class_name,
+        }
     }
 
     pub fn set_field(&mut self, field_name: String, value: Operand) {
-        self.fields.insert(field_name, value);
+        match self {
+            Object::Class { .. } => unreachable!(),
+            Object::Object { fields, .. } => fields.insert(field_name, value),
+        };
     }
 
     pub fn get_field(&self, field_name: &str) -> Option<&Operand> {
-        self.fields.get(field_name)
+        match self {
+            Object::Object { fields, .. } => fields.get(field_name),
+            Object::Class { .. } => unreachable!(),
+        }
     }
 }
 
@@ -57,11 +88,26 @@ impl JvmHeap {
         }
     }
 
-    pub fn new_object(&mut self, class: Class) -> u32 {
-        let obj = Object {
-            class_name: class.name().to_string(),
-            fields: HashMap::new(),
-        };
+    pub fn new_class_object(&mut self, class_name: String) -> u32 {
+        let obj_ref = self.mem.len();
+        self.mem.push(Memory::Object(Object::new_class(class_name)));
+        obj_ref as u32
+    }
+
+    pub fn new_object(&mut self, class_name: String) -> u32 {
+        let obj_ref = self.mem.len();
+        self.mem
+            .push(Memory::Object(Object::new_object(class_name)));
+        obj_ref as u32
+    }
+
+    pub fn new_java_string(&mut self, s: &str) -> u32 {
+        let bytes_str = s.as_bytes();
+        let array = self.new_array(T_CHAR, bytes_str.len() as i32);
+        let mut fields = HashMap::new();
+        fields.insert("value".to_string(), Operand::ArrayRef(array));
+
+        let obj = Object::new_object_with_fields(STRING_CLASS_NAME.to_string(), fields);
         let obj_ref = self.mem.len();
         self.mem.push(Memory::Object(obj));
         obj_ref as u32
@@ -168,6 +214,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
+
     pub fn get_mut_short_array(&mut self, array_ref: Operand) -> &mut Vec<i16> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
@@ -182,6 +229,16 @@ impl JvmHeap {
         match obj_ref {
             Operand::ObjectRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::Object(obj) => obj,
+                _ => unreachable!(),
+            },
+            v => unreachable!("{:?}", v),
+        }
+    }
+
+    pub fn get_class_name(&self, obj_ref: &Operand) -> &str {
+        match obj_ref {
+            Operand::ObjectRef(ref_i) => match &self.mem[*ref_i as usize] {
+                Memory::Object(obj) => obj.class_name(),
                 _ => unreachable!(),
             },
             _ => unreachable!(),

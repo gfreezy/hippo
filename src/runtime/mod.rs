@@ -18,7 +18,7 @@ use crate::runtime::frame::JvmFrame;
 use crate::runtime::heap::JvmHeap;
 use crate::runtime::instruction::*;
 use crate::runtime::method::Method;
-use crate::runtime::native::java_java_lang_Class_getPrimitiveClass;
+use crate::runtime::native::{java_java_lang_Class_getPrimitiveClass, jvm_desiredAssertionStatus};
 use crate::runtime::opcode::show_opcode;
 use std::collections::VecDeque;
 use tracing::{debug, debug_span};
@@ -162,26 +162,8 @@ fn execute_method(
     let _span = span.enter();
 
     if is_native {
-        let frame = thread.stack.frames.back().unwrap();
-        debug!(
-            ?frame,
-            ?args,
-            descriptor = method.descriptor(),
-            "skip native method"
-        );
-        match (method.name(), method.descriptor()) {
-            ("getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;") => {
-                let val =
-                    java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
-                dbg!(val);
-                // frame.operand_stack.push()
-            }
-            _ => {}
-        };
+        execute_native_method(heap, thread, class_loader, &class, method, args);
 
-        if method.return_descriptor() != "V" {
-            panic!("native method returns {}", method.return_descriptor());
-        }
         return;
     }
 
@@ -333,11 +315,26 @@ fn execute_method(
             opcode::PUTFIELD => {
                 putfield(heap, thread, class_loader, &mut code_reader, &class);
             }
+            opcode::GETFIELD => {
+                getfield(heap, thread, class_loader, &mut code_reader, &class);
+            }
             opcode::IFGE => {
                 ifge(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::IFLE => {
                 ifle(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::IFEQ => {
+                ifeq(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::IFNE => {
+                ifne(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::I2F => {
+                i2f(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::FMUL => {
+                fmul(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::FCMPG | opcode::FCMPL => {
                 fcmpg(heap, thread, class_loader, &mut code_reader, &class);
@@ -345,6 +342,7 @@ fn execute_method(
             opcode::ANEWARRAY => {
                 anewarray(heap, thread, class_loader, &mut code_reader, &class);
             }
+
             op => unimplemented!("{}", show_opcode(op)),
         }
     }
@@ -359,4 +357,40 @@ mod tests {
         let mut jvm = Jvm::new("Main");
         jvm.run();
     }
+}
+
+fn execute_native_method(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    class: &Class,
+    method: Method,
+    args: Vec<Operand>,
+) {
+    let frame = thread.stack.frames.back().unwrap();
+    debug!(
+        ?frame,
+        ?args,
+        descriptor = method.descriptor(),
+        "execute_native_method"
+    );
+
+    match (
+        method.name(),
+        method.descriptor(),
+        method.return_descriptor(),
+    ) {
+        ("getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;", _) => {
+            java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
+        }
+        ("desiredAssertionStatus", "()Z", _) => {
+            jvm_desiredAssertionStatus(heap, thread, class_loader, class, args);
+        }
+        (_, _, "V") => {
+            debug!("skip native method");
+        }
+        _ => {
+            panic!("native method: {}", method.descriptor());
+        }
+    };
 }
