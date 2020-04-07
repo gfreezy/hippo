@@ -18,7 +18,11 @@ use crate::runtime::frame::JvmFrame;
 use crate::runtime::heap::JvmHeap;
 use crate::runtime::instruction::*;
 use crate::runtime::method::Method;
-use crate::runtime::native::{java_java_lang_Class_getPrimitiveClass, jvm_desiredAssertionStatus};
+use crate::runtime::native::{
+    java_java_lang_Class_getPrimitiveClass, java_java_lang_Double_doubleToRawLongBits,
+    java_java_lang_Double_longBitsToDouble, java_java_lang_Float_floatToRawIntBits,
+    jvm_desiredAssertionStatus0,
+};
 use crate::runtime::opcode::show_opcode;
 use std::collections::VecDeque;
 use tracing::{debug, debug_span};
@@ -176,7 +180,8 @@ fn execute_method(
         debug!(
             pc = code_reader.pc(),
             opcode = opcode::show_opcode(code),
-            ?frame
+            ?frame,
+            "will execute"
         );
         match code {
             opcode::ICONST_0 => {
@@ -207,27 +212,20 @@ fn execute_method(
                 fconst_n(heap, thread, class_loader, &mut code_reader, &class, 2.0);
             }
             opcode::LDC => ldc(heap, thread, class_loader, &mut code_reader, &class),
-            opcode::ISTORE_0 => {
-                istore_n(heap, thread, class_loader, &mut code_reader, &class, 0);
+            opcode::ISTORE_0 | opcode::ASTORE_0 => {
+                store_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
-            opcode::ISTORE_1 => {
-                istore_n(heap, thread, class_loader, &mut code_reader, &class, 1);
+            opcode::ISTORE_1 | opcode::ASTORE_1 => {
+                store_n(heap, thread, class_loader, &mut code_reader, &class, 1);
             }
-            opcode::ISTORE_2 => {
-                istore_n(heap, thread, class_loader, &mut code_reader, &class, 2);
+            opcode::ISTORE_2 | opcode::ASTORE_2 => {
+                store_n(heap, thread, class_loader, &mut code_reader, &class, 2);
             }
-            opcode::ISTORE_3 => {
-                istore_n(heap, thread, class_loader, &mut code_reader, &class, 3);
+            opcode::ISTORE_3 | opcode::ASTORE_3 => {
+                store_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
-            opcode::ISTORE => {
-                istore(heap, thread, class_loader, &mut code_reader, &class);
-            }
-            opcode::ASTORE_2 => {
-                let frame = thread.stack.frames.back_mut().unwrap();
-                let object_ref = frame.operand_stack.pop_object_ref();
-                frame
-                    .local_variable_array
-                    .set_object_ref_addr(2, object_ref);
+            opcode::ISTORE | opcode::ASTORE => {
+                store(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::BIPUSH => {
                 let frame = thread.stack.frames.back_mut().unwrap();
@@ -280,6 +278,18 @@ fn execute_method(
                 ireturn(heap, thread, class_loader, &mut code_reader, &class);
                 break;
             }
+            opcode::DRETURN => {
+                dreturn(heap, thread, class_loader, &mut code_reader, &class);
+                break;
+            }
+            opcode::FRETURN => {
+                freturn(heap, thread, class_loader, &mut code_reader, &class);
+                break;
+            }
+            opcode::ARETURN => {
+                areturn(heap, thread, class_loader, &mut code_reader, &class);
+                break;
+            }
             opcode::RETURN => {
                 return_(heap, thread, class_loader, &mut code_reader, &class);
                 break;
@@ -321,6 +331,9 @@ fn execute_method(
             opcode::IFGE => {
                 ifge(heap, thread, class_loader, &mut code_reader, &class);
             }
+            opcode::IFGT => {
+                ifgt(heap, thread, class_loader, &mut code_reader, &class);
+            }
             opcode::IFLE => {
                 ifle(heap, thread, class_loader, &mut code_reader, &class);
             }
@@ -330,8 +343,17 @@ fn execute_method(
             opcode::IFNE => {
                 ifne(heap, thread, class_loader, &mut code_reader, &class);
             }
+            opcode::IFNONNULL => {
+                ifnonnull(heap, thread, class_loader, &mut code_reader, &class);
+            }
             opcode::I2F => {
                 i2f(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::F2I => {
+                f2i(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::I2L => {
+                i2l(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::FMUL => {
                 fmul(heap, thread, class_loader, &mut code_reader, &class);
@@ -342,7 +364,24 @@ fn execute_method(
             opcode::ANEWARRAY => {
                 anewarray(heap, thread, class_loader, &mut code_reader, &class);
             }
-
+            opcode::GOTO => {
+                goto(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::LDC2_W => {
+                ldc2_w(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::SIPUSH => {
+                sipush(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::LADD => {
+                ladd(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::LSHL => {
+                lshl(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::LAND => {
+                land(heap, thread, class_loader, &mut code_reader, &class);
+            }
             op => unimplemented!("{}", show_opcode(op)),
         }
     }
@@ -371,6 +410,7 @@ fn execute_native_method(
     debug!(
         ?frame,
         ?args,
+        %method,
         descriptor = method.descriptor(),
         "execute_native_method"
     );
@@ -383,14 +423,23 @@ fn execute_native_method(
         ("getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;", _) => {
             java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
         }
-        ("desiredAssertionStatus", "()Z", _) => {
-            jvm_desiredAssertionStatus(heap, thread, class_loader, class, args);
+        ("desiredAssertionStatus0", "(Ljava/lang/Class;)Z", _) => {
+            jvm_desiredAssertionStatus0(heap, thread, class_loader, class, args);
+        }
+        ("floatToRawIntBits", "(F)I", _) => {
+            java_java_lang_Float_floatToRawIntBits(heap, thread, class_loader, class, args);
+        }
+        ("doubleToRawLongBits", "(D)J", _) => {
+            java_java_lang_Double_doubleToRawLongBits(heap, thread, class_loader, class, args);
+        }
+        ("longBitsToDouble", "(J)D", _) => {
+            java_java_lang_Double_longBitsToDouble(heap, thread, class_loader, class, args);
         }
         (_, _, "V") => {
             debug!("skip native method");
         }
-        _ => {
-            panic!("native method: {}", method.descriptor());
+        (name, descriptor, _) => {
+            panic!("native method: {}:{}, {}", class.name(), name, descriptor);
         }
     };
 }

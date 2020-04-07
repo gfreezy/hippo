@@ -65,7 +65,7 @@ pub fn ldc(
     }
 }
 
-pub fn istore_n(
+pub fn store_n(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
@@ -74,11 +74,11 @@ pub fn istore_n(
     n: i32,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
-    let val = frame.operand_stack.pop_integer();
-    frame.local_variable_array.set_integer(n as u16, val);
+    let val = frame.operand_stack.pop();
+    frame.local_variable_array.set(n as u16, val);
 }
 
-pub fn istore(
+pub fn store(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
     class_loader: &mut ClassLoader,
@@ -87,8 +87,8 @@ pub fn istore(
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
     let index = code_reader.read_u8().unwrap();
-    let val = frame.operand_stack.pop_integer();
-    frame.local_variable_array.set_integer(index as u16, val);
+    let val = frame.operand_stack.pop();
+    frame.local_variable_array.set(index as u16, val);
 }
 
 pub fn iload_n(
@@ -142,6 +142,19 @@ pub fn iadd(
     frame.operand_stack.push_integer(val1 + val2);
 }
 
+pub fn ladd(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_long();
+    let val1 = frame.operand_stack.pop_long();
+    frame.operand_stack.push_long(val1 + val2);
+}
+
 pub fn invokestatic(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -182,6 +195,48 @@ pub fn ireturn(
     let _ = thread.stack.frames.pop_back();
     let last_frame = thread.stack.frames.back_mut().unwrap();
     last_frame.operand_stack.push_integer(val);
+}
+
+pub fn dreturn(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val = frame.operand_stack.pop_double();
+    let _ = thread.stack.frames.pop_back();
+    let last_frame = thread.stack.frames.back_mut().unwrap();
+    last_frame.operand_stack.push_double(val);
+}
+
+pub fn freturn(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val = frame.operand_stack.pop_float();
+    let _ = thread.stack.frames.pop_back();
+    let last_frame = thread.stack.frames.back_mut().unwrap();
+    last_frame.operand_stack.push_float(val);
+}
+
+pub fn areturn(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val = frame.operand_stack.pop();
+    let _ = thread.stack.frames.pop_back();
+    let last_frame = thread.stack.frames.back_mut().unwrap();
+    last_frame.operand_stack.push(val);
 }
 
 pub fn return_(
@@ -238,7 +293,7 @@ pub fn aconst_null(
     class: &Class,
 ) {
     let frame = thread.stack.frames.back_mut().unwrap();
-    frame.operand_stack.push(Operand::ObjectRef(0))
+    frame.operand_stack.push(Operand::Null)
 }
 
 pub fn invokevirtual(
@@ -460,7 +515,7 @@ pub fn getfield(
     let field_ref = class.constant_pool().get_field_ref_at(index);
     let frame = thread.stack.frames.back_mut().unwrap();
     let object_ref = frame.operand_stack.pop();
-    debug!(?field_ref, "getfield");
+    debug!(?object_ref, ?field_ref, "getfield");
     let object = heap.get_object(&object_ref);
     let v = object.get_field(field_ref.field_name).unwrap();
     frame.operand_stack.push(v.clone());
@@ -478,6 +533,22 @@ pub fn ifge(
     let frame = thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value >= 0 {
+        code_reader.set_pc(pc - 1 + offset as usize);
+    }
+}
+
+pub fn ifgt(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop_integer();
+    if value > 0 {
         code_reader.set_pc(pc - 1 + offset as usize);
     }
 }
@@ -530,6 +601,35 @@ pub fn ifne(
     }
 }
 
+pub fn ifnonnull(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop();
+    if value != Operand::Null {
+        code_reader.set_pc(pc - 1 + offset as usize);
+    }
+}
+
+pub fn goto(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    code_reader.set_pc(pc - 1 + offset as usize);
+}
+
 pub fn i2f(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -540,6 +640,30 @@ pub fn i2f(
     let frame = thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     frame.operand_stack.push_float(value as f32);
+}
+
+pub fn f2i(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop_float();
+    frame.operand_stack.push_integer(value as i32);
+}
+
+pub fn i2l(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop_integer();
+    frame.operand_stack.push_long(value as i64);
 }
 
 pub fn fmul(
@@ -572,4 +696,59 @@ pub fn fcmpg(
     } else {
         frame.operand_stack.push_integer(0)
     }
+}
+
+pub fn ldc2_w(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let offset = code_reader.read_u16().unwrap();
+    let n = match class.constant_pool().get_const_pool_info_at(offset) {
+        ConstPoolInfo::ConstantLongInfo(n) => Operand::Long(*n),
+        ConstPoolInfo::ConstantDoubleInfo(n) => Operand::Double(*n),
+        _ => unreachable!(),
+    };
+    let frame = thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push(n);
+}
+
+pub fn sipush(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let n = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push_integer(n as i32);
+}
+
+pub fn lshl(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_integer();
+    let val1 = frame.operand_stack.pop_long();
+    frame.operand_stack.push_long(val1 << (val2 & 0x111111));
+}
+
+pub fn land(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_long();
+    let val1 = frame.operand_stack.pop_long();
+    frame.operand_stack.push_long(val1 & val2);
 }

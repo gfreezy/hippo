@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
     Int(i32),
     Float(f32),
@@ -10,6 +10,32 @@ pub enum Operand {
     Null,
 }
 
+impl Operand {
+    pub fn get_float(&self) -> f32 {
+        match self {
+            Operand::Float(n) => *n,
+            _ => unreachable!(),
+        }
+    }
+    pub fn get_double(&self) -> f64 {
+        match self {
+            Operand::Double(n) => *n,
+            _ => unreachable!(),
+        }
+    }
+    pub fn get_long(&self) -> i64 {
+        match self {
+            Operand::Long(n) => *n,
+            _ => unreachable!(),
+        }
+    }
+    pub fn get_int(&self) -> i32 {
+        match self {
+            Operand::Int(n) => *n,
+            _ => unreachable!(),
+        }
+    }
+}
 #[derive(Debug)]
 pub struct OperandStack {
     stack: Vec<Operand>,
@@ -34,6 +60,13 @@ impl OperandStack {
         self.push(Operand::Int(num))
     }
 
+    pub fn push_long(&mut self, num: i64) {
+        self.push(Operand::Long(num))
+    }
+    pub fn push_double(&mut self, num: f64) {
+        self.push(Operand::Double(num))
+    }
+
     pub fn push_float(&mut self, num: f32) {
         self.push(Operand::Float(num))
     }
@@ -49,6 +82,20 @@ impl OperandStack {
     pub fn pop_integer(&mut self) -> i32 {
         match self.stack.pop() {
             Some(Operand::Int(num)) => num,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn pop_double(&mut self) -> f64 {
+        match self.stack.pop() {
+            Some(Operand::Double(num)) => num,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn pop_long(&mut self) -> i64 {
+        match self.stack.pop() {
+            Some(Operand::Long(num)) => num,
             _ => unreachable!(),
         }
     }

@@ -1,4 +1,3 @@
-use crate::runtime::class::Class;
 use crate::runtime::frame::operand_stack::Operand;
 use std::collections::HashMap;
 
@@ -76,7 +75,7 @@ impl Object {
     pub fn get_field(&self, field_name: &str) -> Option<&Operand> {
         match self {
             Object::Object { fields, .. } => fields.get(field_name),
-            Object::Class { .. } => unreachable!(),
+            Object::Class { .. } => Some(&Operand::Null),
         }
     }
 }
