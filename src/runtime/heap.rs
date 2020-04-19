@@ -1,7 +1,7 @@
 use crate::runtime::class::Class;
 use crate::runtime::frame::operand_stack::Operand;
-use crate::runtime::jvm_env::JvmEnv;
-use std::collections::HashMap;
+use std::fmt;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct JvmHeap {
@@ -31,26 +31,35 @@ enum Memory {
     ShortArray(Vec<i16>),
     IntArray(Vec<i32>),
     LongArray(Vec<i64>),
-    ReferenceArray { class_name: String, array: Vec<u32> },
+    ReferenceArray {
+        class_name: String,
+        array: Vec<Operand>,
+    },
 }
 
-#[derive(Debug)]
 pub enum Object {
-    Class {
-        class_name: String,
-    },
-    Object {
-        class: Class,
-        fields: HashMap<String, Operand>,
-    },
+    Class { class_name: String },
+    Object { class: Class, fields: Vec<Operand> },
+}
+
+impl Debug for Object {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Object::Class { class_name } => write!(f, "Class {{{}}}", class_name),
+            Object::Object { class, .. } => write!(f, "Object {{ class: {}}}", class.name(),),
+        }
+    }
 }
 
 impl Object {
     pub fn new_object(class: Class) -> Self {
-        Object::Object {
-            class,
-            fields: HashMap::new(),
+        let mut fields = Vec::with_capacity(class.total_instance_fields());
+        let all_fields = class.all_instance_fields();
+        assert_eq!(all_fields.len(), class.total_instance_fields());
+        for field in all_fields {
+            fields.push(field.default_value())
         }
+        Object::Object { class, fields }
     }
 
     pub fn new_class(class_name: String) -> Self {
@@ -64,18 +73,27 @@ impl Object {
         }
     }
 
-    pub fn set_field(&mut self, field_name: String, value: Operand) {
+    pub fn set_field(&mut self, idx: usize, value: Operand) {
         match self {
             Object::Class { .. } => unreachable!(),
-            Object::Object { fields, .. } => fields.insert(field_name, value),
+            Object::Object { fields, .. } => fields[idx] = value,
         };
     }
 
-    pub fn get_field(&self, field_name: &str) -> Option<&Operand> {
+    pub fn get_field(&self, idx: usize) -> &Operand {
         match self {
-            Object::Object { fields, .. } => fields.get(field_name),
-            Object::Class { .. } => Some(&Operand::Null),
+            Object::Object { fields, .. } => &fields[idx],
+            Object::Class { .. } => &Operand::Null,
         }
+    }
+
+    pub fn print_fields(&self) {
+        match self {
+            Object::Object { class: _, fields } => {
+                dbg!(fields);
+            }
+            Object::Class { class_name: _ } => {}
+        };
     }
 }
 
@@ -86,32 +104,21 @@ impl JvmHeap {
         }
     }
 
-    pub fn new_class_object(&mut self, class_name: String) -> u32 {
+    fn alloc(&mut self, mem: Memory) -> u32 {
         let obj_ref = self.mem.len();
-        self.mem.push(Memory::Object(Object::new_class(class_name)));
+        self.mem.push(mem);
         obj_ref as u32
+    }
+
+    pub fn new_class_object(&mut self, class_name: String) -> u32 {
+        self.alloc(Memory::Object(Object::new_class(class_name)))
     }
 
     pub fn new_object(&mut self, class: Class) -> u32 {
-        let obj_ref = self.mem.len();
-        self.mem.push(Memory::Object(Object::new_object(class)));
-        obj_ref as u32
+        self.alloc(Memory::Object(Object::new_object(class)))
     }
 
-    pub fn new_java_string(&mut self, s: &str, jenv: &mut JvmEnv) -> u32 {
-        let bytes_str = s.as_bytes();
-        let array = self.new_array(T_CHAR, bytes_str.len() as i32);
-        let mut fields = HashMap::new();
-        fields.insert("value".to_string(), Operand::ArrayRef(array));
-
-        let class = jenv.load_and_init_class(STRING_CLASS_NAME);
-        let obj = Object::new_object(class);
-        let obj_ref = self.mem.len();
-        self.mem.push(Memory::Object(obj));
-        obj_ref as u32
-    }
-
-    pub fn new_array(&mut self, ty: u8, count: i32) -> u32 {
+    pub fn new_empty_array(&mut self, ty: u8, count: i32) -> u32 {
         let m = match ty {
             T_BOOLEAN => Memory::BooleanArray(vec![0; count as usize]),
             T_CHAR => Memory::CharArray(vec![0; count as usize]),
@@ -123,23 +130,19 @@ impl JvmHeap {
             T_LONG => Memory::LongArray(vec![0; count as usize]),
             _ => unreachable!(),
         };
-        let array_ref = self.mem.len();
-        self.mem.push(m);
-        array_ref as u32
+        self.alloc(m)
     }
 
-    pub fn new_byte_array(&mut self, count: i32) -> u32 {
-        self.new_array(T_BYTE, count)
+    pub fn new_char_array(&mut self, data: Vec<u16>) -> u32 {
+        self.alloc(Memory::CharArray(data))
     }
 
     pub fn new_reference_array(&mut self, class_name: String, count: i32) -> u32 {
         let a = Memory::ReferenceArray {
             class_name,
-            array: vec![0; count as usize],
+            array: vec![Operand::Null; count as usize],
         };
-        let array_ref = self.mem.len();
-        self.mem.push(a);
-        array_ref as u32
+        self.alloc(a)
     }
 
     pub fn get_mut_char_array(&mut self, array_ref: Operand) -> &mut Vec<u16> {
@@ -162,7 +165,7 @@ impl JvmHeap {
         }
     }
 
-    pub fn get_mut_int_array(&mut self, array_ref: Operand) -> &mut Vec<i32> {
+    pub fn get_int_array_mut(&mut self, array_ref: Operand) -> &mut Vec<i32> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::IntArray(array) => array,
@@ -171,7 +174,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
-    pub fn get_mut_boolean_array(&mut self, array_ref: Operand) -> &mut Vec<i8> {
+    pub fn get_boolean_array_mut(&mut self, array_ref: Operand) -> &mut Vec<i8> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::BooleanArray(array) => array,
@@ -180,7 +183,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
-    pub fn get_mut_float_array(&mut self, array_ref: Operand) -> &mut Vec<f32> {
+    pub fn get_float_array_mut(&mut self, array_ref: Operand) -> &mut Vec<f32> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::FloatArray(array) => array,
@@ -189,7 +192,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
-    pub fn get_mut_double_array(&mut self, array_ref: Operand) -> &mut Vec<f64> {
+    pub fn get_double_array_mut(&mut self, array_ref: Operand) -> &mut Vec<f64> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::DoubleArray(array) => array,
@@ -198,7 +201,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
-    pub fn get_mut_byte_array(&mut self, array_ref: Operand) -> &mut Vec<i8> {
+    pub fn get_byte_array_mut(&mut self, array_ref: Operand) -> &mut Vec<i8> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::BooleanArray(array) => array,
@@ -207,7 +210,7 @@ impl JvmHeap {
             _ => unreachable!(),
         }
     }
-    pub fn get_mut_long_array(&mut self, array_ref: Operand) -> &mut Vec<i64> {
+    pub fn get_long_array_mut(&mut self, array_ref: Operand) -> &mut Vec<i64> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::LongArray(array) => array,
@@ -217,7 +220,7 @@ impl JvmHeap {
         }
     }
 
-    pub fn get_mut_short_array(&mut self, array_ref: Operand) -> &mut Vec<i16> {
+    pub fn get_short_array_mut(&mut self, array_ref: Operand) -> &mut Vec<i16> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[ref_i as usize] {
                 Memory::ShortArray(array) => array,
@@ -227,7 +230,7 @@ impl JvmHeap {
         }
     }
 
-    pub fn get_mut_object_array(&mut self, array_ref: &Operand) -> &mut Vec<u32> {
+    pub fn get_object_array_mut(&mut self, array_ref: &Operand) -> &mut Vec<Operand> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &mut self.mem[*ref_i as usize] {
                 Memory::ReferenceArray {
@@ -240,7 +243,7 @@ impl JvmHeap {
         }
     }
 
-    pub fn get_object_array(&mut self, array_ref: &Operand) -> &Vec<u32> {
+    pub fn get_object_array(&mut self, array_ref: &Operand) -> &Vec<Operand> {
         match array_ref {
             Operand::ArrayRef(ref_i) => match &self.mem[*ref_i as usize] {
                 Memory::ReferenceArray {
@@ -274,9 +277,9 @@ impl JvmHeap {
         }) as i32
     }
 
-    pub fn get_mut_object(&mut self, obj_ref: Operand) -> &mut Object {
+    pub fn get_object_mut(&mut self, obj_ref: &Operand) -> &mut Object {
         match obj_ref {
-            Operand::ObjectRef(ref_i) => match &mut self.mem[ref_i as usize] {
+            Operand::ObjectRef(ref_i) => match &mut self.mem[*ref_i as usize] {
                 Memory::Object(obj) => obj,
                 _ => unreachable!(),
             },
@@ -290,7 +293,7 @@ impl JvmHeap {
                 Memory::Object(obj) => obj.class_name(),
                 _ => unreachable!(),
             },
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 
@@ -298,15 +301,13 @@ impl JvmHeap {
         match obj_ref {
             Operand::ObjectRef(ref_i) => match &self.mem[*ref_i as usize] {
                 Memory::Object(obj) => obj,
-                _ => unreachable!(),
+                Memory::CharArray(array) => {
+                    let s = String::from_utf16_lossy(array);
+                    unreachable!("{:?}", s);
+                }
+                v => unreachable!("{:?}", v),
             },
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
-    }
-
-    pub fn get_string(&self, str_ref: &Operand) -> String {
-        let string_operand = self.get_object(str_ref);
-        let chars_ref = string_operand.get_field("value").unwrap();
-        String::from_utf16(self.get_char_array(chars_ref)).unwrap()
     }
 }

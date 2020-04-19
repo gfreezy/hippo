@@ -3,6 +3,7 @@ use crate::class_parser::attribute_info::predefined_attribute::{
 };
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::ConstPool;
+use crate::class_parser::{ACC_FINAL, ACC_STATIC};
 use crate::nom_utils::length_many;
 use nom::number::complete::be_u16;
 use nom::IResult;
@@ -41,5 +42,13 @@ impl FieldInfo {
             PredefinedAttribute::ConstantValueAttribute(attr) => Some(attr),
             _ => None,
         })
+    }
+
+    pub fn is_static(&self) -> bool {
+        self.access_flags & ACC_STATIC != 0
+    }
+
+    pub fn is_final(&self) -> bool {
+        self.access_flags & ACC_FINAL != 1
     }
 }

@@ -1,5 +1,8 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
+    Byte(i8),
+    Short(i16),
+    Char(u16),
     Int(i32),
     Float(f32),
     Double(f64),
@@ -44,6 +47,7 @@ impl Operand {
         }
     }
 }
+
 #[derive(Debug)]
 pub struct OperandStack {
     stack: Vec<Operand>,

@@ -2,11 +2,11 @@ use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{ACC_FINAL, ACC_STATIC};
 use crate::runtime::frame::operand_stack::Operand;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Field {
-    inner: Arc<Mutex<InnerField>>,
+    inner: Arc<InnerField>,
 }
 
 #[derive(Debug)]
@@ -14,60 +14,40 @@ struct InnerField {
     access_flags: u16,
     name: String,
     descriptor: String,
-    value: Option<Operand>,
+    index: usize,
 }
 
 impl Field {
-    pub fn new(const_pool: &ConstPool, filed_info: FieldInfo) -> Field {
-        let constant_value_index = filed_info
-            .constant_value_attribute()
-            .map(|attr| attr.constant_value_index);
-        let name = const_pool
-            .get_utf8_string_at(filed_info.name_index)
-            .to_string();
+    pub fn new(const_pool: &ConstPool, field: &FieldInfo, index: usize) -> Field {
+        let name = const_pool.get_utf8_string_at(field.name_index).to_string();
         let descriptor = const_pool
-            .get_utf8_string_at(filed_info.descriptor_index)
+            .get_utf8_string_at(field.descriptor_index)
             .to_string();
-        let value = if filed_info.access_flags & ACC_STATIC != 0
-            && filed_info.access_flags & ACC_FINAL != 0
-            && constant_value_index.is_some()
-        {
-            let constant_value_index = constant_value_index.unwrap();
-            Some(match descriptor.as_str() {
-                "B" | "C" | "I" | "S" | "Z" => {
-                    Operand::Int(const_pool.get_constant_integer_at(constant_value_index))
-                }
-                "D" => Operand::Double(const_pool.get_constant_double_at(constant_value_index)),
-                "F" => Operand::Float(const_pool.get_constant_float_at(constant_value_index)),
-                "J" => Operand::Long(const_pool.get_constant_long_at(constant_value_index)),
-                "Ljava/lang/String;" => {
-                    Operand::Str(const_pool.get_constant_string_at(constant_value_index))
-                }
-                _ => unreachable!(),
-            })
-        } else {
-            None
-        };
+
         Field {
-            inner: Arc::new(Mutex::new(InnerField {
-                access_flags: filed_info.access_flags,
+            inner: Arc::new(InnerField {
+                access_flags: field.access_flags,
                 name,
                 descriptor,
-                value,
-            })),
+                index,
+            }),
         }
     }
 
     pub fn access_flags(&self) -> u16 {
-        self.inner.lock().unwrap().access_flags
+        self.inner.access_flags
     }
 
     pub fn descriptor(&self) -> String {
-        self.inner.lock().unwrap().descriptor.clone()
+        self.inner.descriptor.clone()
     }
 
     pub fn name(&self) -> String {
-        self.inner.lock().unwrap().name.clone()
+        self.inner.name.clone()
+    }
+
+    pub fn index(&self) -> usize {
+        self.inner.index
     }
 
     pub fn is_long_or_double(&self) -> bool {
@@ -83,11 +63,17 @@ impl Field {
         self.access_flags() & ACC_FINAL != 0
     }
 
-    pub fn value(&self) -> Operand {
-        self.inner.lock().unwrap().value.clone().unwrap()
-    }
-
-    pub fn set_value(&self, value: Operand) {
-        self.inner.lock().unwrap().value = Some(value);
+    pub fn default_value(&self) -> Operand {
+        match self.descriptor().as_str() {
+            "B" => Operand::Byte(0),
+            "C" => Operand::Char(0),
+            "D" => Operand::Double(0.0),
+            "F" => Operand::Float(0.0),
+            "I" => Operand::Int(0),
+            "J" => Operand::Long(0),
+            "S" => Operand::Short(0),
+            "Z" => Operand::Int(0),
+            _ => Operand::Null,
+        }
     }
 }

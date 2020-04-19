@@ -5,8 +5,10 @@ use crate::class_parser::{
     is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
     ACC_STATIC, ACC_VARARGS,
 };
+use crate::runtime::cp_cache::CpCache;
+use crate::runtime::jvm_env::JvmPC;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct Method {
@@ -32,6 +34,7 @@ struct InnerMethod {
     class_name: String,
     param_descriptors: Vec<String>,
     return_descriptor: String,
+    cp_cache: Mutex<CpCache>,
 }
 
 impl Method {
@@ -68,6 +71,7 @@ impl Method {
                     class_name,
                     param_descriptors: params,
                     return_descriptor,
+                    cp_cache: Mutex::new(CpCache::new(0)),
                 }),
             }
         } else {
@@ -80,6 +84,7 @@ impl Method {
                     access_flags,
                     name: name.to_string(),
                     descriptor: descriptor.to_string(),
+                    cp_cache: Mutex::new(CpCache::new(code_attr.code.len())),
                     max_locals: code_attr.max_locals as usize,
                     max_stack: code_attr.max_stack as usize,
                     code: Arc::new(code_attr.code),
@@ -91,6 +96,18 @@ impl Method {
                 }),
             }
         }
+    }
+
+    pub fn resolve_field(&self, pc: JvmPC) -> Option<usize> {
+        self.inner.cp_cache.lock().unwrap().resolve_field(pc)
+    }
+
+    pub fn set_field(&self, pc: JvmPC, field_index: usize) {
+        self.inner
+            .cp_cache
+            .lock()
+            .unwrap()
+            .set_field(pc, field_index)
     }
 
     pub fn n_args(&self) -> usize {

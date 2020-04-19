@@ -1,15 +1,17 @@
 use crate::class_parser::constant_pool::ConstPool;
+use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
     ClassFile, ACC_FINAL, ACC_INTERFACE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC, ACC_STATIC,
     ACC_SUPER,
 };
 use crate::runtime::field::Field;
+use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::method::Method;
 use nom::lib::std::collections::HashMap;
 use nom::lib::std::fmt::Formatter;
 use std::cell::Cell;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::trace;
 
 #[derive(Debug, Clone)]
@@ -24,7 +26,9 @@ struct InnerClass {
     access_flags: u16,
     super_class: Option<Class>,
     interfaces: Vec<Class>,
-    fields: HashMap<String, Field>,
+    static_fields: HashMap<String, Field>,
+    instance_fields: HashMap<String, Field>,
+    static_field_values: Mutex<Vec<Operand>>,
     methods: Vec<Method>,
     object_class: Option<Class>,
     inited: Cell<bool>,
@@ -45,29 +49,48 @@ impl Class {
             methods: method_infos,
             ..
         } = class_file;
-        let fields = field_infos
-            .into_iter()
-            .map(|filed| {
-                let f = Field::new(&constant_pool, filed);
-                (f.name().to_string(), f)
-            })
-            .collect();
+        let base_index = super_class
+            .as_ref()
+            .map(|c| c.total_instance_fields())
+            .unwrap_or(0);
+        let mut instance_index = base_index;
+        let mut static_index = 0;
+        let mut static_fields = HashMap::new();
+        let mut instance_fields = HashMap::new();
+        let mut static_field_values = Vec::new();
+        for filed_info in &field_infos {
+            if filed_info.is_static() {
+                let f = Field::new(&constant_pool, filed_info, static_index);
+                static_fields.insert(f.name(), f);
+                let v = get_default_value_from_field_info(filed_info, &constant_pool)
+                    .unwrap_or(Operand::Null);
+                static_field_values.push(v);
+                static_index += 1;
+            } else {
+                let f = Field::new(&constant_pool, filed_info, instance_index);
+                instance_fields.insert(f.name(), f);
+                instance_index += 1;
+            }
+        }
         let methods = method_infos
             .into_iter()
             .map(|method| Method::new(&constant_pool, method, name.clone()))
             .collect();
+        let inner_class = InnerClass {
+            name,
+            constant_pool,
+            access_flags,
+            super_class,
+            instance_fields,
+            static_fields,
+            static_field_values: Mutex::new(static_field_values),
+            methods,
+            interfaces,
+            object_class,
+            inited: Cell::new(false),
+        };
         Class {
-            inner: Arc::new(InnerClass {
-                name,
-                constant_pool,
-                access_flags,
-                super_class,
-                fields,
-                methods,
-                interfaces,
-                object_class,
-                inited: Cell::new(false),
-            }),
+            inner: Arc::new(inner_class),
         }
     }
 
@@ -88,7 +111,7 @@ impl Class {
     }
 
     pub fn is_static(&self) -> bool {
-        self.access_flags() & ACC_STATIC == 1
+        self.access_flags() & ACC_STATIC != 0
     }
 
     pub fn is_super(&self) -> bool {
@@ -126,8 +149,39 @@ impl Class {
         SuperClassesIter(self.clone())
     }
 
-    pub fn fields(&self) -> &HashMap<String, Field> {
-        &self.inner.fields
+    pub fn instance_fields(&self) -> &HashMap<String, Field> {
+        &self.inner.instance_fields
+    }
+
+    fn all_instance_fields_unordered(&self) -> Vec<Field> {
+        let mut fields: Vec<_> = self.instance_fields().values().cloned().collect();
+        if let Some(class) = self.super_class() {
+            for f in class.all_instance_fields_unordered() {
+                fields.push(f);
+            }
+        }
+        fields
+    }
+
+    pub fn all_instance_fields(&self) -> Vec<Field> {
+        let mut fs = self.all_instance_fields_unordered();
+        fs.sort_by_key(|f| f.index());
+        fs
+    }
+    pub fn static_fields(&self) -> &HashMap<String, Field> {
+        &self.inner.static_fields
+    }
+
+    pub fn total_instance_fields(&self) -> usize {
+        self.total_self_instance_fields()
+            + self
+                .super_class()
+                .map(|class| class.total_instance_fields())
+                .unwrap_or(0)
+    }
+
+    pub fn total_self_instance_fields(&self) -> usize {
+        self.inner.instance_fields.len()
     }
 
     pub fn methods(&self) -> &[Method] {
@@ -210,7 +264,7 @@ impl Class {
     }
 
     fn get_self_field(&self, name: &str, descriptor: &str) -> Option<Field> {
-        self.fields()
+        self.instance_fields()
             .get(name)
             .filter(|f| f.descriptor() == descriptor)
             .cloned()
@@ -231,6 +285,21 @@ impl Class {
         }
 
         None
+    }
+
+    pub fn get_static_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+        self.static_fields()
+            .get(name)
+            .filter(|f| f.descriptor() == descriptor)
+            .cloned()
+    }
+
+    pub fn get_static_field_value(&self, index: usize) -> Operand {
+        self.inner.static_field_values.lock().unwrap()[index].clone()
+    }
+
+    pub fn set_static_field_value(&self, index: usize, value: Operand) {
+        self.inner.static_field_values.lock().unwrap()[index] = value;
     }
 
     pub fn get_field(&self, name: &str, descriptor: &str) -> Option<Field> {
@@ -257,15 +326,11 @@ impl Class {
 
     pub fn is_subclass_of(&self, class: Class) -> bool {
         let mut current = self.clone();
-        loop {
-            if current == class {
+        while let Some(klass) = current.super_class() {
+            if klass == class {
                 return true;
             }
-            if let Some(klass) = current.super_class() {
-                current = klass;
-            } else {
-                break;
-            }
+            current = klass;
         }
         false
     }
@@ -294,5 +359,32 @@ impl Iterator for SuperClassesIter {
             self.0 = class;
         }
         super_class
+    }
+}
+
+fn get_default_value_from_field_info(
+    field_info: &FieldInfo,
+    const_pool: &ConstPool,
+) -> Option<Operand> {
+    let constant_value_index = field_info.constant_value_attribute()?.constant_value_index;
+    if field_info.is_static() && field_info.is_final() {
+        let descriptor = const_pool
+            .get_utf8_string_at(field_info.descriptor_index)
+            .to_string();
+
+        Some(match descriptor.as_str() {
+            "B" | "C" | "I" | "S" | "Z" => {
+                Operand::Int(const_pool.get_constant_integer_at(constant_value_index))
+            }
+            "D" => Operand::Double(const_pool.get_constant_double_at(constant_value_index)),
+            "F" => Operand::Float(const_pool.get_constant_float_at(constant_value_index)),
+            "J" => Operand::Long(const_pool.get_constant_long_at(constant_value_index)),
+            "Ljava/lang/String;" => {
+                Operand::Str(const_pool.get_constant_string_at(constant_value_index))
+            }
+            _ => unreachable!(),
+        })
+    } else {
+        None
     }
 }

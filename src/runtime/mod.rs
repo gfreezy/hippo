@@ -1,6 +1,7 @@
 mod class;
 mod class_loader;
 mod code_reader;
+mod cp_cache;
 mod field;
 mod frame;
 mod heap;
@@ -68,13 +69,14 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
     let frame = JvmFrame::new_with_args(&method, args);
     jenv.thread.stack.frames.push_back(frame);
 
-    let mut code_reader = CodeReader::new(method.code());
+    let mut code_reader = CodeReader::new(method);
     while let Some(code) = code_reader.read_u8() {
         let frame = jenv.thread.stack.frames.back().unwrap();
         debug!(
             pc = code_reader.pc(),
             opcode = opcode::show_opcode(code),
             ?frame,
+            ?jenv.heap,
             "will execute"
         );
         match code {
@@ -120,6 +122,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             }
             opcode::ISTORE | opcode::ASTORE => {
                 store(jenv, &mut code_reader, &class);
+            }
+            opcode::AASTORE => {
+                aastore(jenv, &mut code_reader, &class);
             }
             opcode::BIPUSH => {
                 let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -252,6 +257,24 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::IFNULL => {
                 ifnull(jenv, &mut code_reader, &class);
             }
+            opcode::IF_ICMPEQ => {
+                if_icmpeq(jenv, &mut code_reader, &class);
+            }
+            opcode::IF_ICMPGE => {
+                if_icmpge(jenv, &mut code_reader, &class);
+            }
+            opcode::IF_ICMPGT => {
+                if_icmpgt(jenv, &mut code_reader, &class);
+            }
+            opcode::IF_ICMPLE => {
+                if_icmple(jenv, &mut code_reader, &class);
+            }
+            opcode::IF_ICMPLT => {
+                if_icmplt(jenv, &mut code_reader, &class);
+            }
+            opcode::IF_ICMPNE => {
+                if_icmpne(jenv, &mut code_reader, &class);
+            }
             opcode::I2F => {
                 i2f(jenv, &mut code_reader, &class);
             }
@@ -285,18 +308,28 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::LSHL => {
                 lshl(jenv, &mut code_reader, &class);
             }
+            opcode::ISHL => {
+                ishl(jenv, &mut code_reader, &class);
+            }
             opcode::LAND => {
                 land(jenv, &mut code_reader, &class);
             }
             opcode::IAND => {
                 iand(jenv, &mut code_reader, &class);
             }
+            opcode::ISUB => {
+                isub(jenv, &mut code_reader, &class);
+            }
             opcode::ILOAD => {
                 iload(jenv, &mut code_reader, &class);
+            }
+            opcode::IINC => {
+                iinc(jenv, &mut code_reader, &class);
             }
             opcode::ARRAYLENGTH => {
                 arraylength(jenv, &mut code_reader, &class);
             }
+            opcode::MONITORENTER | opcode::MONITOREXIT => {}
             op => unimplemented!("{}", show_opcode(op)),
         }
     }
