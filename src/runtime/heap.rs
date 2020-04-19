@@ -1,8 +1,6 @@
 use crate::runtime::class::Class;
-use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::frame::operand_stack::Operand;
-use crate::runtime::load_and_init_class;
-use crate::runtime::JvmThread;
+use crate::runtime::jvm_env::JvmEnv;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -20,7 +18,7 @@ const T_INT: u8 = 10;
 const T_LONG: u8 = 11;
 
 const CLASS_CLASS_NAME: &str = "java/lang/Class";
-const STRING_CLASS_NAME: &str = "java/lang/String";
+pub const STRING_CLASS_NAME: &str = "java/lang/String";
 
 #[derive(Debug)]
 enum Memory {
@@ -100,18 +98,13 @@ impl JvmHeap {
         obj_ref as u32
     }
 
-    pub fn new_java_string(
-        &mut self,
-        s: &str,
-        thread: &mut JvmThread,
-        class_loader: &mut ClassLoader,
-    ) -> u32 {
+    pub fn new_java_string(&mut self, s: &str, jenv: &mut JvmEnv) -> u32 {
         let bytes_str = s.as_bytes();
         let array = self.new_array(T_CHAR, bytes_str.len() as i32);
         let mut fields = HashMap::new();
         fields.insert("value".to_string(), Operand::ArrayRef(array));
 
-        let class = load_and_init_class(self, thread, class_loader, STRING_CLASS_NAME);
+        let class = jenv.load_and_init_class(STRING_CLASS_NAME);
         let obj = Object::new_object(class);
         let obj_ref = self.mem.len();
         self.mem.push(Memory::Object(obj));
@@ -133,6 +126,10 @@ impl JvmHeap {
         let array_ref = self.mem.len();
         self.mem.push(m);
         array_ref as u32
+    }
+
+    pub fn new_byte_array(&mut self, count: i32) -> u32 {
+        self.new_array(T_BYTE, count)
     }
 
     pub fn new_reference_array(&mut self, class_name: String, count: i32) -> u32 {
