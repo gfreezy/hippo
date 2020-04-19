@@ -19,9 +19,9 @@ use crate::runtime::heap::JvmHeap;
 use crate::runtime::instruction::*;
 use crate::runtime::method::Method;
 use crate::runtime::native::{
-    java_java_lang_Class_getPrimitiveClass, java_java_lang_Double_doubleToRawLongBits,
-    java_java_lang_Double_longBitsToDouble, java_java_lang_Float_floatToRawIntBits,
-    jvm_desiredAssertionStatus0,
+    java_lang_Class_getPrimitiveClass, java_lang_Double_doubleToRawLongBits,
+    java_lang_Double_longBitsToDouble, java_lang_Float_floatToRawIntBits,
+    java_lang_Object_hashCode, java_lang_System_initProperties, jvm_desiredAssertionStatus0,
 };
 use crate::runtime::opcode::show_opcode;
 use std::collections::VecDeque;
@@ -49,7 +49,7 @@ pub struct Jvm {
 }
 
 impl Jvm {
-    pub fn new(class_name: &str) -> Self {
+    pub fn new(class_name: &str, jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
         let mut jvm = Jvm {
             heap: JvmHeap::new(),
             thread: JvmThread {
@@ -58,7 +58,7 @@ impl Jvm {
                 },
                 pc: 0,
             },
-            class_loader: ClassLoader::new(ClassPath::new(None, None)),
+            class_loader: ClassLoader::new(ClassPath::new(jre_opt, cp_opt)),
             main_class: class_name.to_string(),
         };
         let system_class = load_and_init_class(
@@ -151,7 +151,6 @@ fn did_override_method(
     false
 }
 
-//noinspection ALL
 fn execute_method(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -256,6 +255,12 @@ fn execute_method(
             opcode::ALOAD_3 => {
                 aload_n(heap, thread, class_loader, &mut code_reader, &class, 3);
             }
+            opcode::ALOAD => {
+                aload(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::AALOAD => {
+                aaload(heap, thread, class_loader, &mut code_reader, &class);
+            }
             opcode::FLOAD_0 => {
                 fload_n(heap, thread, class_loader, &mut code_reader, &class, 0);
             }
@@ -270,6 +275,9 @@ fn execute_method(
             }
             opcode::IADD => {
                 iadd(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::IREM => {
+                irem(heap, thread, class_loader, &mut code_reader, &class);
             }
             opcode::INVOKESTATIC => {
                 invokestatic(heap, thread, class_loader, &mut code_reader, &class);
@@ -346,6 +354,9 @@ fn execute_method(
             opcode::IFNONNULL => {
                 ifnonnull(heap, thread, class_loader, &mut code_reader, &class);
             }
+            opcode::IFNULL => {
+                ifnull(heap, thread, class_loader, &mut code_reader, &class);
+            }
             opcode::I2F => {
                 i2f(heap, thread, class_loader, &mut code_reader, &class);
             }
@@ -382,19 +393,17 @@ fn execute_method(
             opcode::LAND => {
                 land(heap, thread, class_loader, &mut code_reader, &class);
             }
+            opcode::IAND => {
+                iand(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::ILOAD => {
+                iload(heap, thread, class_loader, &mut code_reader, &class);
+            }
+            opcode::ARRAYLENGTH => {
+                arraylength(heap, thread, class_loader, &mut code_reader, &class);
+            }
             op => unimplemented!("{}", show_opcode(op)),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_run_jvm() {
-        let mut jvm = Jvm::new("Main");
-        jvm.run();
     }
 }
 
@@ -416,30 +425,58 @@ fn execute_native_method(
     );
 
     match (
+        class.name(),
         method.name(),
         method.descriptor(),
         method.return_descriptor(),
     ) {
-        ("getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;", _) => {
-            java_java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
+        ("java/lang/Class", "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;", _) => {
+            java_lang_Class_getPrimitiveClass(heap, thread, class_loader, class, args);
         }
-        ("desiredAssertionStatus0", "(Ljava/lang/Class;)Z", _) => {
+        (_, "desiredAssertionStatus0", "(Ljava/lang/Class;)Z", _) => {
             jvm_desiredAssertionStatus0(heap, thread, class_loader, class, args);
         }
-        ("floatToRawIntBits", "(F)I", _) => {
-            java_java_lang_Float_floatToRawIntBits(heap, thread, class_loader, class, args);
+        ("java/lang/Float", "floatToRawIntBits", "(F)I", _) => {
+            java_lang_Float_floatToRawIntBits(heap, thread, class_loader, class, args);
         }
-        ("doubleToRawLongBits", "(D)J", _) => {
-            java_java_lang_Double_doubleToRawLongBits(heap, thread, class_loader, class, args);
+        ("java/lang/Double", "doubleToRawLongBits", "(D)J", _) => {
+            java_lang_Double_doubleToRawLongBits(heap, thread, class_loader, class, args);
         }
-        ("longBitsToDouble", "(J)D", _) => {
-            java_java_lang_Double_longBitsToDouble(heap, thread, class_loader, class, args);
+        ("java/lang/Double", "longBitsToDouble", "(J)D", _) => {
+            java_lang_Double_longBitsToDouble(heap, thread, class_loader, class, args);
         }
-        (_, _, "V") => {
+        (
+            "java/lang/System",
+            "initProperties",
+            "(Ljava/util/Properties;)Ljava/util/Properties;",
+            _,
+        ) => {
+            java_lang_System_initProperties(heap, thread, class_loader, class, args);
+        }
+        ("java/lang/Object", "hashCode", "()I", _) => {
+            java_lang_Object_hashCode(heap, thread, class_loader, class, args);
+        }
+        (_, _, _, "V") => {
             debug!("skip native method");
         }
-        (name, descriptor, _) => {
-            panic!("native method: {}:{}, {}", class.name(), name, descriptor);
+        (class_name, name, descriptor, _) => {
+            panic!("native method: {}:{}, {}", class_name, name, descriptor);
         }
     };
+}
+
+pub fn execute_java_method(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    class: &Class,
+    method_name: &str,
+    descriptor: &str,
+    is_static: bool,
+    args: Vec<Operand>,
+) {
+    let method = class
+        .get_method(method_name, descriptor, is_static)
+        .unwrap();
+    execute_method(heap, thread, class_loader, method, args)
 }

@@ -14,6 +14,10 @@ fn main() {
     env::set_var("RUST_LOG", "debug");
     tracing_subscriber::fmt::init();
 
-    let mut jvm = Jvm::new("main/Main");
+    let mut jvm = Jvm::new(
+        "main/Main",
+        Some("./jre".to_string()),
+        Some("./jre/lib/rt".to_string()),
+    );
     jvm.run();
 }

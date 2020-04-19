@@ -1,4 +1,8 @@
+use crate::runtime::class::Class;
+use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::frame::operand_stack::Operand;
+use crate::runtime::load_and_init_class;
+use crate::runtime::JvmThread;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -38,20 +42,17 @@ pub enum Object {
         class_name: String,
     },
     Object {
-        class_name: String,
+        class: Class,
         fields: HashMap<String, Operand>,
     },
 }
 
 impl Object {
-    pub fn new_object(class_name: String) -> Self {
+    pub fn new_object(class: Class) -> Self {
         Object::Object {
-            class_name,
+            class,
             fields: HashMap::new(),
         }
-    }
-    pub fn new_object_with_fields(class_name: String, fields: HashMap<String, Operand>) -> Self {
-        Object::Object { class_name, fields }
     }
 
     pub fn new_class(class_name: String) -> Self {
@@ -61,7 +62,7 @@ impl Object {
     pub fn class_name(&self) -> &str {
         match self {
             Object::Class { .. } => CLASS_CLASS_NAME,
-            Object::Object { class_name, .. } => class_name,
+            Object::Object { class, .. } => class.name(),
         }
     }
 
@@ -93,20 +94,25 @@ impl JvmHeap {
         obj_ref as u32
     }
 
-    pub fn new_object(&mut self, class_name: String) -> u32 {
+    pub fn new_object(&mut self, class: Class) -> u32 {
         let obj_ref = self.mem.len();
-        self.mem
-            .push(Memory::Object(Object::new_object(class_name)));
+        self.mem.push(Memory::Object(Object::new_object(class)));
         obj_ref as u32
     }
 
-    pub fn new_java_string(&mut self, s: &str) -> u32 {
+    pub fn new_java_string(
+        &mut self,
+        s: &str,
+        thread: &mut JvmThread,
+        class_loader: &mut ClassLoader,
+    ) -> u32 {
         let bytes_str = s.as_bytes();
         let array = self.new_array(T_CHAR, bytes_str.len() as i32);
         let mut fields = HashMap::new();
         fields.insert("value".to_string(), Operand::ArrayRef(array));
 
-        let obj = Object::new_object_with_fields(STRING_CLASS_NAME.to_string(), fields);
+        let class = load_and_init_class(self, thread, class_loader, STRING_CLASS_NAME);
+        let obj = Object::new_object(class);
         let obj_ref = self.mem.len();
         self.mem.push(Memory::Object(obj));
         obj_ref as u32
@@ -222,6 +228,53 @@ impl JvmHeap {
             },
             _ => unreachable!(),
         }
+    }
+
+    pub fn get_mut_object_array(&mut self, array_ref: &Operand) -> &mut Vec<u32> {
+        match array_ref {
+            Operand::ArrayRef(ref_i) => match &mut self.mem[*ref_i as usize] {
+                Memory::ReferenceArray {
+                    class_name: _,
+                    array,
+                } => array,
+                _ => unreachable!(),
+            },
+            v => unreachable!("{:?}", v),
+        }
+    }
+
+    pub fn get_object_array(&mut self, array_ref: &Operand) -> &Vec<u32> {
+        match array_ref {
+            Operand::ArrayRef(ref_i) => match &self.mem[*ref_i as usize] {
+                Memory::ReferenceArray {
+                    class_name: _,
+                    array,
+                } => array,
+                _ => unreachable!(),
+            },
+            v => unreachable!("{:?}", v),
+        }
+    }
+
+    pub fn get_array_length(&mut self, array_ref: &Operand) -> i32 {
+        (match array_ref {
+            Operand::ArrayRef(ref_i) => match &mut self.mem[*ref_i as usize] {
+                Memory::ShortArray(array) => array.len(),
+                Memory::BooleanArray(array) => array.len(),
+                Memory::CharArray(array) => array.len(),
+                Memory::FloatArray(array) => array.len(),
+                Memory::DoubleArray(array) => array.len(),
+                Memory::ByteArray(array) => array.len(),
+                Memory::IntArray(array) => array.len(),
+                Memory::LongArray(array) => array.len(),
+                Memory::ReferenceArray {
+                    class_name: _,
+                    array,
+                } => array.len(),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }) as i32
     }
 
     pub fn get_mut_object(&mut self, obj_ref: Operand) -> &mut Object {

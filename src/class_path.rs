@@ -134,6 +134,7 @@ fn get_jre(jre_opt: Option<String>) -> String {
         Some(ref jre) if exists(jre) => jre.to_string(),
         _ => {
             if exists("./jre") {
+                println!("use jre in current dir");
                 "./jre".to_string()
             } else {
                 match env::var_os("JAVA_HOME") {

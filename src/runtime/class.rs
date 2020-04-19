@@ -88,7 +88,7 @@ impl Class {
     }
 
     pub fn is_static(&self) -> bool {
-        self.access_flags() & ACC_STATIC != 0
+        self.access_flags() & ACC_STATIC == 1
     }
 
     pub fn is_super(&self) -> bool {

@@ -39,22 +39,25 @@ pub fn ldc(
     code_reader: &mut CodeReader,
     class: &Class,
 ) {
-    let frame = thread.stack.frames.back_mut().unwrap();
     let index = code_reader.read_u8().unwrap();
     let const_pool_info = class.constant_pool().get_const_pool_info_at(index as u16);
     match const_pool_info {
         ConstPoolInfo::ConstantIntegerInfo(num) => {
+            let frame = thread.stack.frames.back_mut().unwrap();
             frame.operand_stack.push_integer(*num);
         }
         ConstPoolInfo::ConstantFloatInfo(num) => {
+            let frame = thread.stack.frames.back_mut().unwrap();
             frame.operand_stack.push_float(*num);
         }
         ConstPoolInfo::ConstantStringInfo { string_index } => {
             let s = class.constant_pool().get_utf8_string_at(*string_index);
-            let str_ref = heap.new_java_string(s);
+            let str_ref = heap.new_java_string(s, thread, class_loader);
+            let frame = thread.stack.frames.back_mut().unwrap();
             frame.operand_stack.push_object_ref(str_ref)
         }
         ConstPoolInfo::ConstantClassInfo { name_index } => {
+            let frame = thread.stack.frames.back_mut().unwrap();
             let name = class.constant_pool().get_utf8_string_at(*name_index);
             let obj_ref = heap.new_class_object(name.clone());
             frame.operand_stack.push_object_ref(obj_ref);
@@ -104,6 +107,19 @@ pub fn iload_n(
     frame.operand_stack.push_integer(val);
 }
 
+pub fn iload(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let index = code_reader.read_u8().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val = frame.local_variable_array.get_integer(index as u16);
+    frame.operand_stack.push_integer(val);
+}
+
 pub fn aload_n(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -115,6 +131,33 @@ pub fn aload_n(
     let frame = thread.stack.frames.back_mut().unwrap();
     let val = frame.local_variable_array.get_object(n as u16);
     frame.operand_stack.push(val);
+}
+
+pub fn aload(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let index = code_reader.read_u8().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val = frame.local_variable_array.get_object(index as u16);
+    frame.operand_stack.push(val);
+}
+
+pub fn aaload(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let index = frame.operand_stack.pop_integer();
+    let array_ref = frame.operand_stack.pop();
+    let array = heap.get_object_array(&array_ref);
+    frame.operand_stack.push_object_ref(array[index as usize]);
 }
 
 pub fn fload_n(
@@ -129,6 +172,20 @@ pub fn fload_n(
     let val = frame.local_variable_array.get_float(n as u16);
     frame.operand_stack.push_float(val);
 }
+
+pub fn irem(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_integer();
+    let val1 = frame.operand_stack.pop_integer();
+    frame.operand_stack.push_integer(val1 % val2);
+}
+
 pub fn iadd(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -373,7 +430,8 @@ pub fn new(
 ) {
     let index = code_reader.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
-    let object_ref = heap.new_object(class_name.clone());
+    let class = load_and_init_class(heap, thread, class_loader, class_name);
+    let object_ref = heap.new_object(class);
     let frame = thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::ObjectRef(object_ref))
 }
@@ -405,6 +463,19 @@ pub fn anewarray(
     let resolved_class_name = class.constant_pool().get_class_name_at(index);
     let array_ref = heap.new_reference_array(resolved_class_name.clone(), count);
     frame.operand_stack.push(Operand::ArrayRef(array_ref))
+}
+
+pub fn arraylength(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let array_ref = frame.operand_stack.pop();
+    let len = heap.get_array_length(&array_ref);
+    frame.operand_stack.push_integer(len);
 }
 
 pub fn dup(
@@ -449,14 +520,19 @@ pub fn invokespecial(
 
     let resolved_class = load_and_init_class(heap, thread, class_loader, method_ref.class_name);
 
-    let resolved_method = class
+    let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
-        .expect("get method");
+        .expect(&format!(
+            "get method: {}, descriptor: {}, class: {}",
+            method_ref.method_name,
+            method_ref.descriptor,
+            resolved_class.name()
+        ));
 
     let actual_class = if !resolved_method.is_initialization_method()
         && (resolved_class.is_interface()
             || (resolved_class.is_class() && class.is_subclass_of(resolved_class.clone())))
-        && class.is_static()
+        && class.is_super()
     {
         class.super_class().unwrap()
     } else {
@@ -617,6 +693,21 @@ pub fn ifnonnull(
     }
 }
 
+pub fn ifnull(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_u16().unwrap();
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let value = frame.operand_stack.pop();
+    if value == Operand::Null {
+        code_reader.set_pc(pc - 1 + offset as usize);
+    }
+}
 pub fn goto(
     heap: &mut JvmHeap,
     thread: &mut JvmThread,
@@ -751,4 +842,17 @@ pub fn land(
     let val2 = frame.operand_stack.pop_long();
     let val1 = frame.operand_stack.pop_long();
     frame.operand_stack.push_long(val1 & val2);
+}
+
+pub fn iand(
+    heap: &mut JvmHeap,
+    thread: &mut JvmThread,
+    class_loader: &mut ClassLoader,
+    code_reader: &mut CodeReader,
+    class: &Class,
+) {
+    let frame = thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_integer();
+    let val1 = frame.operand_stack.pop_integer();
+    frame.operand_stack.push_integer(val1 & val2);
 }

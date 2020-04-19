@@ -29,9 +29,17 @@ impl Operand {
             _ => unreachable!(),
         }
     }
+
     pub fn get_int(&self) -> i32 {
         match self {
             Operand::Int(n) => *n,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn hash_code(&self) -> i32 {
+        match self {
+            Operand::ObjectRef(i) | Operand::ArrayRef(i) => *i as i32,
             _ => unreachable!(),
         }
     }

@@ -62,7 +62,7 @@ impl LocalVariableArray {
 
     pub fn get_object(&mut self, index: u16) -> Operand {
         match &self.local_variables[index as usize] {
-            v @ Operand::ObjectRef(_) | v @ Operand::Null => v.clone(),
+            v @ Operand::ObjectRef(_) | v @ Operand::Null | v @ Operand::ArrayRef(_) => v.clone(),
             v => unreachable!("{:?}", v),
         }
     }
