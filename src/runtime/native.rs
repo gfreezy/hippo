@@ -1,13 +1,13 @@
 #![allow(non_snake_case)]
 
-use crate::runtime::class::Class;
+use crate::runtime::class::InstanceClass;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::jvm_env::JvmEnv;
 
 pub fn java_lang_Class_getPrimitiveClass(
     jenv: &mut JvmEnv,
-    _class: &Class,
+    _class: &InstanceClass,
     mut args: Vec<Operand>,
 ) {
     let string_ref = args.pop().unwrap();
@@ -18,24 +18,36 @@ pub fn java_lang_Class_getPrimitiveClass(
     frame.operand_stack.push(Operand::ObjectRef(obj_ref));
 }
 
-pub fn jvm_desiredAssertionStatus0(jenv: &mut JvmEnv, _class: &Class, _args: Vec<Operand>) {
+pub fn jvm_desiredAssertionStatus0(jenv: &mut JvmEnv, _class: &InstanceClass, _args: Vec<Operand>) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_integer(0);
 }
 
-pub fn java_lang_Float_floatToRawIntBits(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+pub fn java_lang_Float_floatToRawIntBits(
+    jenv: &mut JvmEnv,
+    _class: &InstanceClass,
+    args: Vec<Operand>,
+) {
     let n = args[0].get_float();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_integer(n.to_bits() as i32);
 }
 
-pub fn java_lang_Double_doubleToRawLongBits(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+pub fn java_lang_Double_doubleToRawLongBits(
+    jenv: &mut JvmEnv,
+    _class: &InstanceClass,
+    args: Vec<Operand>,
+) {
     let n = args[0].get_double();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_long(n.to_bits() as i64);
 }
 
-pub fn java_lang_Double_longBitsToDouble(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+pub fn java_lang_Double_longBitsToDouble(
+    jenv: &mut JvmEnv,
+    _class: &InstanceClass,
+    args: Vec<Operand>,
+) {
     let n = args[0].get_long();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame
@@ -43,7 +55,11 @@ pub fn java_lang_Double_longBitsToDouble(jenv: &mut JvmEnv, _class: &Class, args
         .push_double(f64::from_be_bytes(n.to_be_bytes()));
 }
 
-pub fn java_lang_System_initProperties(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+pub fn java_lang_System_initProperties(
+    jenv: &mut JvmEnv,
+    _class: &InstanceClass,
+    args: Vec<Operand>,
+) {
     let props_ref = &args[0];
     let properties = jenv.heap.get_object(props_ref);
     let class_name = properties.class_name().to_string();
@@ -82,7 +98,7 @@ pub fn java_lang_System_initProperties(jenv: &mut JvmEnv, _class: &Class, args: 
     frame.operand_stack.push(props_ref.clone());
 }
 
-pub fn java_lang_Object_hashCode(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+pub fn java_lang_Object_hashCode(jenv: &mut JvmEnv, _class: &InstanceClass, args: Vec<Operand>) {
     let obj = &args[0];
     jenv.thread
         .stack

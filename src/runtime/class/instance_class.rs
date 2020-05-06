@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use tracing::trace;
 
 #[derive(Debug, Clone)]
-pub struct Class {
+pub struct InstanceClass {
     inner: Arc<InnerClass>,
 }
 
@@ -24,23 +24,23 @@ struct InnerClass {
     name: String,
     constant_pool: ConstPool,
     access_flags: u16,
-    super_class: Option<Class>,
-    interfaces: Vec<Class>,
+    super_class: Option<InstanceClass>,
+    interfaces: Vec<InstanceClass>,
     static_fields: HashMap<String, Field>,
     instance_fields: HashMap<String, Field>,
     static_field_values: Mutex<Vec<Operand>>,
     methods: Vec<Method>,
-    object_class: Option<Class>,
+    object_class: Option<InstanceClass>,
     inited: Cell<bool>,
 }
 
-impl Class {
+impl InstanceClass {
     pub fn new(
         name: String,
         class_file: ClassFile,
-        super_class: Option<Class>,
-        interfaces: Vec<Class>,
-        object_class: Option<Class>,
+        super_class: Option<InstanceClass>,
+        interfaces: Vec<InstanceClass>,
+        object_class: Option<InstanceClass>,
     ) -> Self {
         let ClassFile {
             constant_pool,
@@ -89,7 +89,7 @@ impl Class {
             object_class,
             inited: Cell::new(false),
         };
-        Class {
+        InstanceClass {
             inner: Arc::new(inner_class),
         }
     }
@@ -141,7 +141,7 @@ impl Class {
         self.inner.access_flags
     }
 
-    pub fn super_class(&self) -> Option<Class> {
+    pub fn super_class(&self) -> Option<InstanceClass> {
         self.inner.super_class.clone()
     }
 
@@ -188,7 +188,7 @@ impl Class {
         &self.inner.methods
     }
 
-    pub fn interfaces(&self) -> &[Class] {
+    pub fn interfaces(&self) -> &[InstanceClass] {
         &self.inner.interfaces
     }
 
@@ -324,7 +324,7 @@ impl Class {
         None
     }
 
-    pub fn is_subclass_of(&self, class: Class) -> bool {
+    pub fn is_subclass_of(&self, class: InstanceClass) -> bool {
         let mut current = self.clone();
         while let Some(klass) = current.super_class() {
             if klass == class {
@@ -336,22 +336,22 @@ impl Class {
     }
 }
 
-impl fmt::Display for Class {
+impl fmt::Display for InstanceClass {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl PartialEq for Class {
+impl PartialEq for InstanceClass {
     fn eq(&self, other: &Self) -> bool {
         self.name() == other.name()
     }
 }
 
-pub struct SuperClassesIter(Class);
+pub struct SuperClassesIter(InstanceClass);
 
 impl Iterator for SuperClassesIter {
-    type Item = Class;
+    type Item = InstanceClass;
 
     fn next(&mut self) -> Option<Self::Item> {
         let super_class = self.0.super_class();

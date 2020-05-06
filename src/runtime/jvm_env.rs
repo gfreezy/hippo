@@ -1,5 +1,5 @@
 use crate::class_path::ClassPath;
-use crate::runtime::class::Class;
+use crate::runtime::class::InstanceClass;
 use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
@@ -46,8 +46,8 @@ impl JvmEnv {
         }
     }
 
-    pub fn load_and_init_class(&mut self, class_name: &str) -> Class {
-        let class = self.class_loader.load_class(class_name);
+    pub fn load_and_init_class(&mut self, class_name: &str) -> InstanceClass {
+        let class = self.class_loader.load_class(class_name).instance_class();
         if !class.is_inited() {
             let span = debug_span!("init_class", %class_name);
             let _s = span.enter();

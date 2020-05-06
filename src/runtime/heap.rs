@@ -1,4 +1,4 @@
-use crate::runtime::class::Class;
+use crate::runtime::class::InstanceClass;
 use crate::runtime::frame::operand_stack::Operand;
 use std::fmt;
 use std::fmt::Debug;
@@ -38,8 +38,13 @@ enum Memory {
 }
 
 pub enum Object {
-    Class { class_name: String },
-    Object { class: Class, fields: Vec<Operand> },
+    Class {
+        class_name: String,
+    },
+    Object {
+        class: InstanceClass,
+        fields: Vec<Operand>,
+    },
 }
 
 impl Debug for Object {
@@ -52,7 +57,7 @@ impl Debug for Object {
 }
 
 impl Object {
-    pub fn new_object(class: Class) -> Self {
+    pub fn new_object(class: InstanceClass) -> Self {
         let mut fields = Vec::with_capacity(class.total_instance_fields());
         let all_fields = class.all_instance_fields();
         assert_eq!(all_fields.len(), class.total_instance_fields());
@@ -114,7 +119,7 @@ impl JvmHeap {
         self.alloc(Memory::Object(Object::new_class(class_name)))
     }
 
-    pub fn new_object(&mut self, class: Class) -> u32 {
+    pub fn new_object(&mut self, class: InstanceClass) -> u32 {
         self.alloc(Memory::Object(Object::new_object(class)))
     }
 
@@ -287,11 +292,19 @@ impl JvmHeap {
         }
     }
 
-    pub fn get_class_name(&self, obj_ref: &Operand) -> &str {
+    pub fn get_class_name(&self, obj_ref: &Operand) -> String {
         match obj_ref {
             Operand::ObjectRef(ref_i) => match &self.mem[*ref_i as usize] {
-                Memory::Object(obj) => obj.class_name(),
-                _ => unreachable!(),
+                Memory::Object(obj) => obj.class_name().to_string(),
+                Memory::BooleanArray(_) => "[Z".to_string(),
+                Memory::CharArray(_) => "[C".to_string(),
+                Memory::FloatArray(_) => "[F".to_string(),
+                Memory::DoubleArray(_) => "[D".to_string(),
+                Memory::ByteArray(_) => "[B".to_string(),
+                Memory::ShortArray(_) => "[S".to_string(),
+                Memory::IntArray(_) => "[I".to_string(),
+                Memory::LongArray(_) => "[L".to_string(),
+                Memory::ReferenceArray { class_name, .. } => format!("[L{};", class_name),
             },
             v => unreachable!("{:?}", v),
         }

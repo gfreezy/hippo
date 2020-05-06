@@ -11,18 +11,14 @@ mod method;
 mod native;
 mod opcode;
 
-use crate::runtime::class::Class;
+use crate::runtime::class::InstanceClass;
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
 use crate::runtime::instruction::*;
 use crate::runtime::jvm_env::JvmEnv;
 use crate::runtime::method::Method;
-use crate::runtime::native::{
-    java_lang_Class_getPrimitiveClass, java_lang_Double_doubleToRawLongBits,
-    java_lang_Double_longBitsToDouble, java_lang_Float_floatToRawIntBits,
-    java_lang_Object_hashCode, java_lang_System_initProperties, jvm_desiredAssertionStatus0,
-};
+use crate::runtime::native::*;
 use crate::runtime::opcode::show_opcode;
 use tracing::debug;
 
@@ -335,7 +331,12 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
     }
 }
 
-fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args: Vec<Operand>) {
+fn execute_native_method(
+    jenv: &mut JvmEnv,
+    class: &InstanceClass,
+    method: Method,
+    args: Vec<Operand>,
+) {
     let frame = jenv.thread.stack.frames.back().unwrap();
     debug!(
         ?frame,
@@ -388,7 +389,7 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
 
 pub fn execute_java_method(
     jenv: &mut JvmEnv,
-    class: &Class,
+    class: &InstanceClass,
     method_name: &str,
     descriptor: &str,
     is_static: bool,
