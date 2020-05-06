@@ -12,7 +12,6 @@ pub fn java_lang_Class_getPrimitiveClass(
 ) {
     let string_ref = args.pop().unwrap();
     let class_name = jenv.get_java_string(&string_ref);
-    dbg!("dbg_class_name", &class_name);
     let obj_ref = jenv.heap.new_class_object(class_name);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::ObjectRef(obj_ref));

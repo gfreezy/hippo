@@ -2,6 +2,7 @@
 
 use crate::runtime::Jvm;
 use std::env;
+use std::fs::OpenOptions;
 use tracing_subscriber::EnvFilter;
 
 #[macro_use]
@@ -13,8 +14,13 @@ mod runtime;
 
 fn main() {
     env::set_var("RUST_LOG", "debug");
-    let file_appender = tracing_appender::rolling::hourly(".", "hippo.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open("hippo.log")
+        .unwrap();
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file);
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_writer(non_blocking)

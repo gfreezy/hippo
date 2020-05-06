@@ -211,6 +211,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::INVOKEVIRTUAL => {
                 invokevirtual(jenv, &mut code_reader, &class);
             }
+            opcode::INVOKEINTERFACE => {
+                invokeinterface(jenv, &mut code_reader, &class);
+            }
             opcode::NEW => {
                 new(jenv, &mut code_reader, &class);
             }
@@ -324,6 +327,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             }
             opcode::ARRAYLENGTH => {
                 arraylength(jenv, &mut code_reader, &class);
+            }
+            opcode::POP => {
+                pop(jenv, &mut code_reader, &class);
             }
             opcode::MONITORENTER | opcode::MONITOREXIT => {}
             op => unimplemented!("{}", show_opcode(op)),

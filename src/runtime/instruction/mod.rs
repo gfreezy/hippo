@@ -309,6 +309,66 @@ pub fn invokevirtual(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &In
     execute_method(jenv, acutal_method, args);
 }
 
+pub fn invokeinterface(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+    let index = code_reader.read_u16().unwrap();
+    let method_ref = class.constant_pool().get_method_ref_at(index);
+    debug!(?method_ref, "invokevirtual");
+    let resolved_class = jenv.load_and_init_class(method_ref.class_name);
+    let resolved_method = resolved_class
+        .get_method(method_ref.method_name, method_ref.descriptor, false)
+        .expect(&format!("get method: {}", &method_ref.method_name));
+    assert!(
+        resolved_method.name() != "<init>" && resolved_method.name() != "<clinit>",
+        "<init> and <clinit> are not allowed here"
+    );
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let n_args = resolved_method.n_args();
+    let mut args = Vec::with_capacity(n_args + 1);
+    for i in 0..n_args {
+        args.push(frame.operand_stack.pop());
+    }
+    let object_ref = frame.operand_stack.pop();
+    args.push(object_ref.clone());
+    args.reverse();
+
+    if resolved_method.is_native() {
+        execute_method(jenv, resolved_method, args);
+        return;
+    }
+
+    let class_name = jenv.heap.get_class_name(&object_ref).to_string();
+    let object_class = jenv.load_and_init_class(&class_name);
+
+    let acutal_method = if !resolved_method.is_signature_polymorphic() {
+        if let Some(actual_method) = object_class
+            .get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
+            .filter(|m| jenv.did_override_method(m, &resolved_method))
+        {
+            actual_method
+        } else if let Some(actual_method) = object_class
+            .iter_super_classes()
+            .filter_map(|klass| {
+                klass.get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
+            })
+            .find(|m| jenv.did_override_method(m, &resolved_method))
+        {
+            actual_method
+        } else if let Some(actual_method) =
+            object_class.get_interface_method(resolved_method.name(), resolved_method.descriptor())
+        {
+            actual_method
+        } else {
+            unreachable!("no method found")
+        }
+    } else {
+        unimplemented!("is_signature_polymorphic")
+    };
+
+    let actual_class = jenv.load_and_init_class(acutal_method.class_name());
+
+    execute_method(jenv, acutal_method, args);
+}
+
 pub fn new(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let index = code_reader.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
@@ -342,6 +402,11 @@ pub fn arraylength(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Inst
     let array_ref = frame.operand_stack.pop();
     let len = jenv.heap.get_array_length(&array_ref);
     frame.operand_stack.push_integer(len);
+}
+
+pub fn pop(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let _ = frame.operand_stack.pop();
 }
 
 pub fn dup(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
@@ -472,144 +537,144 @@ pub fn getfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instanc
 
 pub fn ifge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value >= 0 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn ifgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value > 0 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn ifle(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value <= 0 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 == value2 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 != value2 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmplt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 < value2 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmple(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 <= value2 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 > value2 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 >= value2 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn ifeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value == 0 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn ifne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value != 0 {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn ifnonnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop();
     if value != Operand::Null {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 
 pub fn ifnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop();
     if value == Operand::Null {
-        code_reader.set_pc(pc - 1 + offset as usize);
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
 pub fn goto(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_u16().unwrap();
+    let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
-    code_reader.set_pc(pc - 1 + offset as usize);
+    code_reader.set_pc((pc as i16 - 1 + offset) as usize);
 }
 
 pub fn i2f(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
