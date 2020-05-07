@@ -13,7 +13,7 @@ mod nom_utils;
 mod runtime;
 
 fn main() {
-    env::set_var("RUST_LOG", "debug");
+    env::set_var("RUST_LOG", "info");
     let file = OpenOptions::new()
         .write(true)
         .truncate(true)
