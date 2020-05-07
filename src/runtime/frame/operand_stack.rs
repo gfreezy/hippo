@@ -122,12 +122,6 @@ impl OperandStack {
     pub fn pop_object_ref(&mut self) -> u32 {
         match self.stack.pop() {
             Some(Operand::ObjectRef(num)) => num,
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn pop_array_ref(&mut self) -> u32 {
-        match self.stack.pop() {
             Some(Operand::ArrayRef(num)) => num,
             _ => unreachable!(),
         }

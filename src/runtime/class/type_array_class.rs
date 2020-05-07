@@ -1,5 +1,4 @@
 #[derive(Clone, Debug)]
 pub struct TypeArrayClass {
-    length: usize,
-    ty: u8,
+    pub ty: u8,
 }

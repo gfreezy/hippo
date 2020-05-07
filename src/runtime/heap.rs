@@ -1,4 +1,4 @@
-use crate::runtime::class::InstanceClass;
+use crate::runtime::class::{Class, InstanceClass};
 use crate::runtime::frame::operand_stack::Operand;
 use std::fmt;
 use std::fmt::Debug;
@@ -17,8 +17,9 @@ const T_SHORT: u8 = 9;
 const T_INT: u8 = 10;
 const T_LONG: u8 = 11;
 
-const CLASS_CLASS_NAME: &str = "java/lang/Class";
+pub const CLASS_CLASS_NAME: &str = "java/lang/Class";
 pub const STRING_CLASS_NAME: &str = "java/lang/String";
+pub const OBJECT_CLASS_NAME: &str = "java/lang/Object;";
 
 #[derive(Debug)]
 enum Memory {
@@ -119,7 +120,14 @@ impl JvmHeap {
         self.alloc(Memory::Object(Object::new_class(class_name)))
     }
 
-    pub fn new_object(&mut self, class: InstanceClass) -> u32 {
+    pub fn new_object(&mut self, class: Class) -> u32 {
+        match class {
+            Class::InstanceClass(class) => self.new_instance_object(class),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn new_instance_object(&mut self, class: InstanceClass) -> u32 {
         self.alloc(Memory::Object(Object::new_object(class)))
     }
 
@@ -294,18 +302,20 @@ impl JvmHeap {
 
     pub fn get_class_name(&self, obj_ref: &Operand) -> String {
         match obj_ref {
-            Operand::ObjectRef(ref_i) => match &self.mem[*ref_i as usize] {
-                Memory::Object(obj) => obj.class_name().to_string(),
-                Memory::BooleanArray(_) => "[Z".to_string(),
-                Memory::CharArray(_) => "[C".to_string(),
-                Memory::FloatArray(_) => "[F".to_string(),
-                Memory::DoubleArray(_) => "[D".to_string(),
-                Memory::ByteArray(_) => "[B".to_string(),
-                Memory::ShortArray(_) => "[S".to_string(),
-                Memory::IntArray(_) => "[I".to_string(),
-                Memory::LongArray(_) => "[L".to_string(),
-                Memory::ReferenceArray { class_name, .. } => format!("[L{};", class_name),
-            },
+            Operand::ObjectRef(ref_i) | Operand::ArrayRef(ref_i) => {
+                match &self.mem[*ref_i as usize] {
+                    Memory::Object(obj) => obj.class_name().to_string(),
+                    Memory::BooleanArray(_) => "[Z".to_string(),
+                    Memory::CharArray(_) => "[C".to_string(),
+                    Memory::FloatArray(_) => "[F".to_string(),
+                    Memory::DoubleArray(_) => "[D".to_string(),
+                    Memory::ByteArray(_) => "[B".to_string(),
+                    Memory::ShortArray(_) => "[S".to_string(),
+                    Memory::IntArray(_) => "[I".to_string(),
+                    Memory::LongArray(_) => "[J".to_string(),
+                    Memory::ReferenceArray { class_name, .. } => format!("[L{};", class_name),
+                }
+            }
             v => unreachable!("{:?}", v),
         }
     }

@@ -49,6 +49,6 @@ impl FieldInfo {
     }
 
     pub fn is_final(&self) -> bool {
-        self.access_flags & ACC_FINAL != 1
+        self.access_flags & ACC_FINAL != 0
     }
 }

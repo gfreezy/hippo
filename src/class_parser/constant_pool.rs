@@ -113,6 +113,24 @@ impl ConstPool {
         }
     }
 
+    pub fn get_interface_method_ref_at(&self, index: u16) -> MethodRef<'_> {
+        match self.get_const_pool_info_at(index) {
+            ConstPoolInfo::ConstantInterfaceMethodRefInfo {
+                class_index,
+                name_and_type_index,
+            } => {
+                let class_name = self.get_class_name_at(*class_index);
+                let (method_name, method_type) = self.get_name_and_type_at(*name_and_type_index);
+                MethodRef {
+                    class_name,
+                    method_name,
+                    descriptor: method_type,
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
     pub fn get_class_method_or_interface_method_at(&self, index: u16) -> MethodRef<'_> {
         match self.get_const_pool_info_at(index) {
             ConstPoolInfo::ConstantMethodRefInfo {

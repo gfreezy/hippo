@@ -1,6 +1,7 @@
 use crate::class_parser::parse_class_file;
 use crate::class_path::ClassPath;
-use crate::runtime::class::{Class, InstanceClass};
+use crate::runtime::class::{Class, InstanceClass, ObjArrayClass, TypeArrayClass};
+use crate::runtime::heap::OBJECT_CLASS_NAME;
 use std::collections::HashMap;
 use tracing::debug;
 
@@ -22,15 +23,29 @@ impl ClassLoader {
         if self.classes.contains_key(name) {
             self.classes
                 .get(name)
-                .expect(&format!("get class: {}", name))
+                .unwrap_or_else(|| panic!("get class: {}", name))
                 .clone()
         } else {
             debug!(%name, "load_class");
-            let data = self
-                .class_path
-                .read_class(name)
-                .expect(&format!("read class file: {}", name));
-            let class: Class = self.define_class(name.to_string(), data).into();
+            let name_bytes = name.as_bytes();
+            let class: Class = if name_bytes[0] == b'[' {
+                match name_bytes[1] {
+                    b'L' => {
+                        let class_name =
+                            std::str::from_utf8(&name_bytes[2..name_bytes.len() - 1]).unwrap();
+                        Class::ObjArrayClass(ObjArrayClass {
+                            class: class_name.to_string(),
+                        })
+                    }
+                    ty => Class::TypeArrayClass(TypeArrayClass { ty }),
+                }
+            } else {
+                let data = self
+                    .class_path
+                    .read_class(name)
+                    .unwrap_or_else(|_| panic!("read class file: {}", name));
+                self.define_class(name.to_string(), data).into()
+            };
             self.classes.insert(name.to_string(), class.clone());
             class
         }
@@ -55,8 +70,7 @@ impl ClassLoader {
             interfaces.push(self.load_class(interface_name).instance_class());
         }
 
-        const OBJECT_CLASS: &str = "java/lang/Object;";
-        let object_class = if name == OBJECT_CLASS {
+        let object_class = if name == OBJECT_CLASS_NAME {
             Some(self.load_class("java/lang/Object").instance_class())
         } else {
             None

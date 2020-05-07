@@ -19,7 +19,7 @@ enum Entry {
 
 impl Entry {
     fn new(path: &str) -> Entry {
-        if path.ends_with("*") {
+        if path.ends_with('*') {
             trace!(path, "Entry::new Wildcard");
             let len = path.len();
             let base_path = &path[..len - 1];
@@ -70,7 +70,7 @@ impl Entry {
                     .map(|x| Entry::new(x.to_str().unwrap()))
                     .map(|x| x.read_class(class_file_name))
                     .find(|x| x.is_ok())
-                    .unwrap_or(Err(Error::new(ErrorKind::Other, "Class not found")))
+                    .unwrap_or_else(|| Err(Error::new(ErrorKind::Other, "Class not found")))
             }
             Entry::Zip { path } => {
                 trace!("read class {} using Zip", class_file_name);
@@ -121,7 +121,7 @@ fn parse_boot_classpath(jre: &str) -> Entry {
 }
 
 fn parse_user_classpath(cp_opt: Option<String>) -> Entry {
-    let cp = cp_opt.unwrap_or(".".to_owned());
+    let cp = cp_opt.unwrap_or_else(|| ".".to_owned());
     Entry::new(&cp)
 }
 

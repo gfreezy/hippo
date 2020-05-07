@@ -192,6 +192,14 @@ impl InstanceClass {
         &self.inner.interfaces
     }
 
+    pub fn did_implement_interface(&self, interface: InstanceClass) -> bool {
+        self.inner.interfaces.contains(&interface)
+            || self
+                .super_class()
+                .map(|c| c.did_implement_interface(interface))
+                .unwrap_or(false)
+    }
+
     pub fn name(&self) -> &str {
         &self.inner.name
     }

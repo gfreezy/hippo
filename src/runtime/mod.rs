@@ -11,7 +11,7 @@ mod method;
 mod native;
 mod opcode;
 
-use crate::runtime::class::InstanceClass;
+use crate::runtime::class::{Class, InstanceClass};
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
@@ -43,7 +43,10 @@ impl Jvm {
     }
 
     pub fn run(&mut self) {
-        let class = self.jenv.load_and_init_class(&self.main_class);
+        let class = self
+            .jenv
+            .load_and_init_class(&self.main_class)
+            .instance_class();
         let main_method = class.main_method().expect("find main method");
         execute_method(&mut self.jenv, main_method, vec![]);
     }
@@ -274,6 +277,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::IF_ICMPNE => {
                 if_icmpne(jenv, &mut code_reader, &class);
             }
+            opcode::IF_ACMPNE => {
+                if_acmpne(jenv, &mut code_reader, &class);
+            }
             opcode::I2F => {
                 i2f(jenv, &mut code_reader, &class);
             }
@@ -310,6 +316,12 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::ISHL => {
                 ishl(jenv, &mut code_reader, &class);
             }
+            opcode::IUSHR => {
+                iushr(jenv, &mut code_reader, &class);
+            }
+            opcode::IXOR => {
+                ixor(jenv, &mut code_reader, &class);
+            }
             opcode::LAND => {
                 land(jenv, &mut code_reader, &class);
             }
@@ -331,18 +343,22 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::POP => {
                 pop(jenv, &mut code_reader, &class);
             }
+            opcode::CHECKCAST => {
+                checkcast(jenv, &mut code_reader, &class);
+            }
+            opcode::DUP_X1 => {
+                dup_x1(jenv, &mut code_reader, &class);
+            }
+            opcode::INSTANCEOF => {
+                instanceof(jenv, &mut code_reader, &class);
+            }
             opcode::MONITORENTER | opcode::MONITOREXIT => {}
             op => unimplemented!("{}", show_opcode(op)),
         }
     }
 }
 
-fn execute_native_method(
-    jenv: &mut JvmEnv,
-    class: &InstanceClass,
-    method: Method,
-    args: Vec<Operand>,
-) {
+fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args: Vec<Operand>) {
     let frame = jenv.thread.stack.frames.back().unwrap();
     debug!(
         ?frame,
@@ -352,42 +368,39 @@ fn execute_native_method(
         "execute_native_method"
     );
 
-    match (
-        class.name(),
-        method.name(),
-        method.descriptor(),
-        method.return_descriptor(),
-    ) {
-        ("java/lang/Class", "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;", _) => {
+    match (class.name(), method.name(), method.descriptor()) {
+        ("java/lang/Class", "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;") => {
             java_lang_Class_getPrimitiveClass(jenv, class, args);
         }
-        (_, "desiredAssertionStatus0", "(Ljava/lang/Class;)Z", _) => {
+        (_, "desiredAssertionStatus0", "(Ljava/lang/Class;)Z") => {
             jvm_desiredAssertionStatus0(jenv, class, args);
         }
-        ("java/lang/Float", "floatToRawIntBits", "(F)I", _) => {
+        ("java/lang/Float", "floatToRawIntBits", "(F)I") => {
             java_lang_Float_floatToRawIntBits(jenv, class, args);
         }
-        ("java/lang/Double", "doubleToRawLongBits", "(D)J", _) => {
+        ("java/lang/Double", "doubleToRawLongBits", "(D)J") => {
             java_lang_Double_doubleToRawLongBits(jenv, class, args);
         }
-        ("java/lang/Double", "longBitsToDouble", "(J)D", _) => {
+        ("java/lang/Double", "longBitsToDouble", "(J)D") => {
             java_lang_Double_longBitsToDouble(jenv, class, args);
         }
         (
             "java/lang/System",
             "initProperties",
             "(Ljava/util/Properties;)Ljava/util/Properties;",
-            _,
         ) => {
             java_lang_System_initProperties(jenv, class, args);
         }
-        ("java/lang/Object", "hashCode", "()I", _) => {
+        ("java/lang/Object", "hashCode", "()I") => {
             java_lang_Object_hashCode(jenv, class, args);
         }
-        (_, _, _, "V") => {
-            debug!("skip native method");
+        ("java/lang/System", "registerNatives", "()V") => {
+            java_lang_System_registerNatives(jenv, class, args);
         }
-        (class_name, name, descriptor, _) => {
+        ("java/lang/Object", "registerNatives", "()V") => {
+            java_lang_Object_registerNatives(jenv, class, args);
+        }
+        (class_name, name, descriptor) => {
             panic!("native method: {}:{}, {}", class_name, name, descriptor);
         }
     };

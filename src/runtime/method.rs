@@ -47,7 +47,7 @@ impl Method {
         let access_flags = method_info.access_flags;
         let parameters = if let Some(params) = method_info.parameters() {
             params
-                .into_iter()
+                .iter()
                 .map(|p| Parameter {
                     name: const_pool.get_utf8_string_at(p.name_index).to_string(),
                     access_flags: p.access_flags,
@@ -77,7 +77,7 @@ impl Method {
         } else {
             let code_attr = method_info
                 .code_attr()
-                .expect(&format!("get method code attr: {}", name));
+                .unwrap_or_else(|| panic!("get method code attr: {}", name));
 
             Method {
                 inner: Arc::new(InnerMethod {

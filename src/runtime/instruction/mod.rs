@@ -1,23 +1,24 @@
 #![allow(unused_variables)]
 use crate::class_parser::constant_pool::ConstPoolInfo;
-use crate::runtime::class::InstanceClass;
+use crate::runtime::class::Class;
 use crate::runtime::code_reader::CodeReader;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
+use crate::runtime::heap::OBJECT_CLASS_NAME;
 use crate::runtime::jvm_env::JvmEnv;
 use tracing::debug;
 
-pub fn iconst_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass, n: i32) {
+pub fn iconst_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class, n: i32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_integer(n);
 }
 
-pub fn fconst_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass, n: f32) {
+pub fn fconst_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class, n: f32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_float(n);
 }
 
-pub fn ldc(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ldc(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u8().unwrap();
     let const_pool_info = class.constant_pool().get_const_pool_info_at(index as u16);
     match const_pool_info {
@@ -47,20 +48,20 @@ pub fn ldc(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClas
     }
 }
 
-pub fn store_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass, n: i32) {
+pub fn store_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class, n: i32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop();
     frame.local_variable_array.set(n as u16, val);
 }
 
-pub fn store(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn store(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = code_reader.read_u8().unwrap();
     let val = frame.operand_stack.pop();
     frame.local_variable_array.set(index as u16, val);
 }
 
-pub fn aastore(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn aastore(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop();
     let index = frame.operand_stack.pop_integer();
@@ -69,20 +70,20 @@ pub fn aastore(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instance
     array[index as usize] = val;
 }
 
-pub fn iload_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass, n: i32) {
+pub fn iload_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class, n: i32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.local_variable_array.get_integer(n as u16);
     frame.operand_stack.push_integer(val);
 }
 
-pub fn iload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn iload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u8().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.local_variable_array.get_integer(index as u16);
     frame.operand_stack.push_integer(val);
 }
 
-pub fn iinc(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn iinc(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u8().unwrap();
     // amount is signed
     let amount = code_reader.read_u8().unwrap() as i8 as i32;
@@ -93,20 +94,20 @@ pub fn iinc(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCla
         .set_integer(index as u16, val + amount);
 }
 
-pub fn aload_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass, n: i32) {
+pub fn aload_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class, n: i32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.local_variable_array.get_object(n as u16);
     frame.operand_stack.push(val);
 }
 
-pub fn aload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn aload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u8().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.local_variable_array.get_object(index as u16);
     frame.operand_stack.push(val);
 }
 
-pub fn aaload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn aaload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = frame.operand_stack.pop_integer();
     let array_ref = frame.operand_stack.pop();
@@ -115,34 +116,34 @@ pub fn aaload(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceC
     frame.operand_stack.push(array[index as usize].clone());
 }
 
-pub fn fload_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass, n: i32) {
+pub fn fload_n(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class, n: i32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.local_variable_array.get_float(n as u16);
     frame.operand_stack.push_float(val);
 }
 
-pub fn irem(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn irem(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
     let val1 = frame.operand_stack.pop_integer();
     frame.operand_stack.push_integer(val1 % val2);
 }
 
-pub fn iadd(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn iadd(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
     let val1 = frame.operand_stack.pop_integer();
     frame.operand_stack.push_integer(val1 + val2);
 }
 
-pub fn ladd(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ladd(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_long();
     let val1 = frame.operand_stack.pop_long();
     frame.operand_stack.push_long(val1 + val2);
 }
 
-pub fn invokestatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn invokestatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u16().unwrap();
     let method_ref = class
         .constant_pool()
@@ -164,7 +165,7 @@ pub fn invokestatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Ins
     execute_method(jenv, method, args);
 }
 
-pub fn ireturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ireturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop_integer();
     let _ = jenv.thread.stack.frames.pop_back();
@@ -172,7 +173,7 @@ pub fn ireturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instance
     last_frame.operand_stack.push_integer(val);
 }
 
-pub fn dreturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn dreturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop_double();
     let _ = jenv.thread.stack.frames.pop_back();
@@ -180,7 +181,7 @@ pub fn dreturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instance
     last_frame.operand_stack.push_double(val);
 }
 
-pub fn freturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn freturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop_float();
     let _ = jenv.thread.stack.frames.pop_back();
@@ -188,7 +189,7 @@ pub fn freturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instance
     last_frame.operand_stack.push_float(val);
 }
 
-pub fn areturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn areturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop();
     let _ = jenv.thread.stack.frames.pop_back();
@@ -196,11 +197,11 @@ pub fn areturn(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instance
     last_frame.operand_stack.push(val);
 }
 
-pub fn return_(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn return_(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let _ = jenv.thread.stack.frames.pop_back();
 }
 
-pub fn getstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn getstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let opcode_pc = code_reader.pc() - 1;
     let index = code_reader.read_u16().unwrap();
     let method = code_reader.method();
@@ -211,7 +212,7 @@ pub fn getstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
         let field_class = jenv.load_and_init_class(field_ref.class_name);
         let field = field_class
             .get_static_field(field_ref.field_name, field_ref.descriptor)
-            .expect(&format!("resolve field: {:?}", field_ref));
+            .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
         let field_index = field.index();
         method.set_field(opcode_pc, field_index);
         field_index
@@ -223,7 +224,7 @@ pub fn getstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
         .push(class.get_static_field_value(field_index))
 }
 
-pub fn putstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn putstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let opcode_pc = code_reader.pc() - 1;
     let index = code_reader.read_u16().unwrap();
     let method = code_reader.method();
@@ -234,7 +235,7 @@ pub fn putstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
         let field_class = jenv.load_and_init_class(field_ref.class_name);
         let field = field_class
             .get_static_field(field_ref.field_name, field_ref.descriptor)
-            .expect(&format!("resolve field: {:?}", field_ref));
+            .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
         let field_index = field.index();
         method.set_field(opcode_pc, field_index);
         field_index
@@ -244,19 +245,19 @@ pub fn putstatic(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     class.set_static_field_value(field_index, value);
 }
 
-pub fn aconst_null(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn aconst_null(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::Null)
 }
 
-pub fn invokevirtual(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn invokevirtual(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u16().unwrap();
     let method_ref = class.constant_pool().get_method_ref_at(index);
     debug!(?method_ref, "invokevirtual");
     let resolved_class = jenv.load_and_init_class(method_ref.class_name);
     let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
-        .expect(&format!("get method: {}", &method_ref.method_name));
+        .unwrap_or_else(|| panic!("get method: {}", &method_ref.method_name));
     assert!(
         resolved_method.name() != "<init>" && resolved_method.name() != "<clinit>",
         "<init> and <clinit> are not allowed here"
@@ -276,7 +277,7 @@ pub fn invokevirtual(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &In
         return;
     }
 
-    let class_name = jenv.heap.get_class_name(&object_ref).to_string();
+    let class_name = jenv.heap.get_class_name(&object_ref);
     let object_class = jenv.load_and_init_class(&class_name);
 
     let acutal_method = if !resolved_method.is_signature_polymorphic() {
@@ -309,14 +310,18 @@ pub fn invokevirtual(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &In
     execute_method(jenv, acutal_method, args);
 }
 
-pub fn invokeinterface(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn invokeinterface(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u16().unwrap();
-    let method_ref = class.constant_pool().get_method_ref_at(index);
-    debug!(?method_ref, "invokevirtual");
+    let count = code_reader.read_u8().unwrap();
+    assert_ne!(count, 0);
+    let forth = code_reader.read_u8().unwrap();
+    assert_eq!(forth, 0);
+    let method_ref = class.constant_pool().get_interface_method_ref_at(index);
+    debug!(?method_ref, "invokeinterface");
     let resolved_class = jenv.load_and_init_class(method_ref.class_name);
     let resolved_method = resolved_class
-        .get_method(method_ref.method_name, method_ref.descriptor, false)
-        .expect(&format!("get method: {}", &method_ref.method_name));
+        .get_interface_method(method_ref.method_name, method_ref.descriptor)
+        .unwrap_or_else(|| panic!("get interface method: {}", &method_ref.method_name));
     assert!(
         resolved_method.name() != "<init>" && resolved_method.name() != "<clinit>",
         "<init> and <clinit> are not allowed here"
@@ -336,32 +341,23 @@ pub fn invokeinterface(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &
         return;
     }
 
-    let class_name = jenv.heap.get_class_name(&object_ref).to_string();
+    let class_name = jenv.heap.get_class_name(&object_ref);
     let object_class = jenv.load_and_init_class(&class_name);
 
-    let acutal_method = if !resolved_method.is_signature_polymorphic() {
-        if let Some(actual_method) = object_class
-            .get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
-            .filter(|m| jenv.did_override_method(m, &resolved_method))
-        {
-            actual_method
-        } else if let Some(actual_method) = object_class
-            .iter_super_classes()
-            .filter_map(|klass| {
-                klass.get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
-            })
-            .find(|m| jenv.did_override_method(m, &resolved_method))
-        {
-            actual_method
-        } else if let Some(actual_method) =
-            object_class.get_interface_method(resolved_method.name(), resolved_method.descriptor())
-        {
-            actual_method
-        } else {
-            unreachable!("no method found")
-        }
+    let acutal_method = if let Some(actual_method) =
+        object_class.get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
+    {
+        actual_method
+    } else if let Some(actual_method) = object_class.iter_super_classes().find_map(|klass| {
+        klass.get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
+    }) {
+        actual_method
+    } else if let Some(actual_method) =
+        object_class.get_interface_method(resolved_method.name(), resolved_method.descriptor())
+    {
+        actual_method
     } else {
-        unimplemented!("is_signature_polymorphic")
+        unreachable!("no method found")
     };
 
     let actual_class = jenv.load_and_init_class(acutal_method.class_name());
@@ -369,7 +365,7 @@ pub fn invokeinterface(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &
     execute_method(jenv, acutal_method, args);
 }
 
-pub fn new(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn new(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = jenv.load_and_init_class(class_name);
@@ -378,7 +374,7 @@ pub fn new(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClas
     frame.operand_stack.push(Operand::ObjectRef(object_ref))
 }
 
-pub fn newarray(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn newarray(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let count = frame.operand_stack.pop_integer();
     let atype = code_reader.read_u8().unwrap();
@@ -386,7 +382,7 @@ pub fn newarray(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instanc
     frame.operand_stack.push(Operand::ArrayRef(array_ref))
 }
 
-pub fn anewarray(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn anewarray(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let count = frame.operand_stack.pop_integer();
     let index = code_reader.read_u16().unwrap();
@@ -397,26 +393,79 @@ pub fn anewarray(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     frame.operand_stack.push(Operand::ArrayRef(array_ref))
 }
 
-pub fn arraylength(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn arraylength(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let array_ref = frame.operand_stack.pop();
     let len = jenv.heap.get_array_length(&array_ref);
     frame.operand_stack.push_integer(len);
 }
 
-pub fn pop(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn pop(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let _ = frame.operand_stack.pop();
 }
 
-pub fn dup(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+fn can_cast_to(jenv: &mut JvmEnv, s: Class, t: Class) -> bool {
+    match (s, t) {
+        (Class::InstanceClass(s), Class::InstanceClass(t))
+            if (s.is_class() && t.is_class()) || (s.is_interface() && t.is_interface()) =>
+        {
+            s == t || s.is_subclass_of(t)
+        }
+        (Class::InstanceClass(s), Class::InstanceClass(t)) if s.is_class() && t.is_interface() => {
+            s.did_implement_interface(t)
+        }
+        (Class::InstanceClass(s), Class::InstanceClass(t)) if s.is_interface() && t.is_class() => {
+            t.name() == OBJECT_CLASS_NAME
+        }
+        (s, Class::InstanceClass(t)) if t.is_class() => t.name() == OBJECT_CLASS_NAME,
+        (s, Class::InstanceClass(t)) if t.is_interface() => unimplemented!(),
+        (Class::TypeArrayClass(s), Class::TypeArrayClass(t)) => s.ty == t.ty,
+        (Class::ObjArrayClass(s), Class::ObjArrayClass(t)) => {
+            let sc = jenv.load_and_init_class(&s.class);
+            let tc = jenv.load_and_init_class(&t.class);
+            can_cast_to(jenv, sc, tc)
+        }
+        _ => false,
+    }
+}
+
+pub fn checkcast(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let index = code_reader.read_u16().unwrap();
+    let class_name = class.constant_pool().get_class_name_at(index);
+    let class = jenv.load_and_init_class(class_name);
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let obj_ref = frame.operand_stack.pop();
+    if obj_ref == Operand::Null {
+        frame.operand_stack.push(obj_ref);
+        return;
+    }
+    let obj_class_name = jenv.heap.get_class_name(&obj_ref);
+    let obj_class = jenv.load_and_init_class(&obj_class_name);
+
+    assert!(can_cast_to(jenv, obj_class, class));
+
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push(obj_ref);
+}
+
+pub fn dup(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop();
     frame.operand_stack.push(val.clone());
     frame.operand_stack.push(val);
 }
 
-pub fn castore(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn dup_x1(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let val1 = frame.operand_stack.pop();
+    let val2 = frame.operand_stack.pop();
+    frame.operand_stack.push(val1.clone());
+    frame.operand_stack.push(val2);
+    frame.operand_stack.push(val1);
+}
+
+pub fn castore(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val = frame.operand_stack.pop_integer();
     let index = frame.operand_stack.pop_integer();
@@ -425,7 +474,7 @@ pub fn castore(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instance
     array[index as usize] = val as u16;
 }
 
-pub fn invokespecial(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn invokespecial(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u16().unwrap();
     let method_ref = class
         .constant_pool()
@@ -435,12 +484,14 @@ pub fn invokespecial(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &In
 
     let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
-        .expect(&format!(
-            "get method: {}, descriptor: {}, class: {}",
-            method_ref.method_name,
-            method_ref.descriptor,
-            resolved_class.name()
-        ));
+        .unwrap_or_else(|| {
+            panic!(
+                "get method: {}, descriptor: {}, class: {}",
+                method_ref.method_name,
+                method_ref.descriptor,
+                resolved_class.name()
+            )
+        });
 
     let actual_class = if !resolved_method.is_initialization_method()
         && (resolved_class.is_interface()
@@ -458,12 +509,14 @@ pub fn invokespecial(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &In
             resolved_method.descriptor(),
             resolved_method.is_static(),
         )
-        .expect(&format!(
-            "class: {}, method: {}, descriptor: {}",
-            actual_class.name(),
-            resolved_method.name(),
-            resolved_method.descriptor()
-        ));
+        .unwrap_or_else(|| {
+            panic!(
+                "class: {}, method: {}, descriptor: {}",
+                actual_class.name(),
+                resolved_method.name(),
+                resolved_method.descriptor()
+            )
+        });
 
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let n_args = actual_method.n_args();
@@ -482,7 +535,7 @@ pub fn invokespecial(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &In
     }
 }
 
-pub fn putfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn putfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let opcode_pc = code_reader.pc() - 1;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = code_reader.read_u16().unwrap();
@@ -508,7 +561,7 @@ pub fn putfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instanc
     obj.set_field(field_index, value);
 }
 
-pub fn getfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn getfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let opcode_pc = code_reader.pc() - 1;
     let index = code_reader.read_u16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -535,7 +588,7 @@ pub fn getfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instanc
     frame.operand_stack.push(field);
 }
 
-pub fn ifge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -545,7 +598,7 @@ pub fn ifge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCla
     }
 }
 
-pub fn ifgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -555,7 +608,7 @@ pub fn ifgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCla
     }
 }
 
-pub fn ifle(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifle(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -565,7 +618,7 @@ pub fn ifle(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCla
     }
 }
 
-pub fn if_icmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn if_icmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -576,7 +629,7 @@ pub fn if_icmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn if_icmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn if_icmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -587,7 +640,29 @@ pub fn if_icmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn if_icmplt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn if_acmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_i16().unwrap();
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let value2 = frame.operand_stack.pop();
+    let value1 = frame.operand_stack.pop();
+    if value1 != value2 {
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+    }
+}
+
+pub fn if_acmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let pc = code_reader.pc();
+    let offset = code_reader.read_i16().unwrap();
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let value2 = frame.operand_stack.pop();
+    let value1 = frame.operand_stack.pop();
+    if value1 == value2 {
+        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+    }
+}
+
+pub fn if_icmplt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -598,7 +673,7 @@ pub fn if_icmplt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn if_icmple(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn if_icmple(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -609,7 +684,7 @@ pub fn if_icmple(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn if_icmpgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn if_icmpgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -620,7 +695,7 @@ pub fn if_icmpgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn if_icmpge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn if_icmpge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -631,7 +706,7 @@ pub fn if_icmpge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn ifeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -641,7 +716,7 @@ pub fn ifeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCla
     }
 }
 
-pub fn ifne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -651,7 +726,7 @@ pub fn ifne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCla
     }
 }
 
-pub fn ifnonnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifnonnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -661,7 +736,7 @@ pub fn ifnonnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Instan
     }
 }
 
-pub fn ifnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ifnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
@@ -670,39 +745,39 @@ pub fn ifnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceC
         code_reader.set_pc((pc as i16 - 1 + offset) as usize);
     }
 }
-pub fn goto(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn goto(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
     let offset = code_reader.read_i16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     code_reader.set_pc((pc as i16 - 1 + offset) as usize);
 }
 
-pub fn i2f(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn i2f(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     frame.operand_stack.push_float(value as f32);
 }
 
-pub fn f2i(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn f2i(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_float();
     frame.operand_stack.push_integer(value as i32);
 }
 
-pub fn i2l(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn i2l(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     frame.operand_stack.push_long(value as i64);
 }
 
-pub fn fmul(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn fmul(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_float();
     let value1 = frame.operand_stack.pop_float();
     frame.operand_stack.push_float(value1 * value2);
 }
 
-pub fn fcmpg(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn fcmpg(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_float();
     let value1 = frame.operand_stack.pop_float();
@@ -715,7 +790,7 @@ pub fn fcmpg(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceCl
     }
 }
 
-pub fn ldc2_w(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ldc2_w(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let offset = code_reader.read_u16().unwrap();
     let n = match class.constant_pool().get_const_pool_info_at(offset) {
         ConstPoolInfo::ConstantLongInfo(n) => Operand::Long(*n),
@@ -726,43 +801,82 @@ pub fn ldc2_w(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceC
     frame.operand_stack.push(n);
 }
 
-pub fn sipush(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn sipush(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let n = code_reader.read_u16().unwrap();
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_integer(n as i32);
 }
 
-pub fn lshl(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn lshl(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
     let val1 = frame.operand_stack.pop_long();
-    frame.operand_stack.push_long(val1 << (val2 & 0x111111));
+    frame.operand_stack.push_long(val1 << (val2 & 0x0011_1111));
 }
 
-pub fn ishl(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn ishl(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
     let val1 = frame.operand_stack.pop_integer();
-    frame.operand_stack.push_integer(val1 << (val2 & 0x111111));
+    frame
+        .operand_stack
+        .push_integer(val1 << (val2 & 0x0011_1111));
 }
 
-pub fn land(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn iushr(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_integer();
+    let val1 = frame.operand_stack.pop_integer();
+    frame
+        .operand_stack
+        .push_integer(val1 >> (val2 & 0x0001_1111));
+}
+
+pub fn ixor(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let val2 = frame.operand_stack.pop_integer();
+    let val1 = frame.operand_stack.pop_integer();
+    frame.operand_stack.push_integer(val1 | val2);
+}
+
+pub fn land(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_long();
     let val1 = frame.operand_stack.pop_long();
     frame.operand_stack.push_long(val1 & val2);
 }
 
-pub fn iand(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn iand(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
     let val1 = frame.operand_stack.pop_integer();
     frame.operand_stack.push_integer(val1 & val2);
 }
 
-pub fn isub(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &InstanceClass) {
+pub fn isub(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let val2 = frame.operand_stack.pop_integer();
     let val1 = frame.operand_stack.pop_integer();
     frame.operand_stack.push_integer(val1 - val2);
+}
+
+pub fn instanceof(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let index = code_reader.read_u16().unwrap();
+    let class_name = class.constant_pool().get_class_name_at(index);
+    let class = jenv.load_and_init_class(class_name);
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let obj_ref = frame.operand_stack.pop();
+    if obj_ref == Operand::Null {
+        frame.operand_stack.push_integer(0);
+        return;
+    }
+    let obj_class_name = jenv.heap.get_class_name(&obj_ref);
+    let obj_class = jenv.load_and_init_class(&obj_class_name);
+    let v = if can_cast_to(jenv, obj_class, class) {
+        1
+    } else {
+        0
+    };
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push_integer(v);
 }

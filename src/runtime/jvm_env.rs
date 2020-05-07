@@ -1,5 +1,5 @@
 use crate::class_path::ClassPath;
-use crate::runtime::class::InstanceClass;
+use crate::runtime::class::Class;
 use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
@@ -46,16 +46,18 @@ impl JvmEnv {
         }
     }
 
-    pub fn load_and_init_class(&mut self, class_name: &str) -> InstanceClass {
-        let class = self.class_loader.load_class(class_name).instance_class();
-        if !class.is_inited() {
-            let span = debug_span!("init_class", %class_name);
-            let _s = span.enter();
-            class.set_inited();
-            debug!("init successfully.");
-            let clinit_method = class.clinit_method();
-            if let Some(clinit_method) = clinit_method {
-                execute_method(self, clinit_method, vec![]);
+    pub fn load_and_init_class(&mut self, class_name: &str) -> Class {
+        let mut class = self.class_loader.load_class(class_name);
+        if let Class::InstanceClass(class) = &mut class {
+            if !class.is_inited() {
+                let span = debug_span!("init_class", %class_name);
+                let _s = span.enter();
+                class.set_inited();
+                debug!("init successfully.");
+                let clinit_method = class.clinit_method();
+                if let Some(clinit_method) = clinit_method {
+                    execute_method(self, clinit_method, vec![]);
+                }
             }
         }
         class
@@ -66,7 +68,7 @@ impl JvmEnv {
         let array = self.heap.new_char_array(bytes_str.collect());
 
         let class = self.load_and_init_class(STRING_CLASS_NAME);
-        let obj_ref = self.heap.new_object(class.clone());
+        let obj_ref = self.heap.new_object(class);
         let object = self.heap.get_object_mut(&Operand::ObjectRef(obj_ref));
         object.set_field(JAVA_STRING_FIELD_VALUE_INDEX, Operand::ArrayRef(array));
         object.set_field(JAVA_STRING_FIELD_HASH_INDEX, Operand::Int(obj_ref as i32));
@@ -83,8 +85,8 @@ impl JvmEnv {
         if method == other {
             return true;
         }
-        let this_class = self.load_and_init_class(method.name());
-        let other_class = self.load_and_init_class(other.name());
+        let this_class = self.load_and_init_class(method.name()).instance_class();
+        let other_class = self.load_and_init_class(other.name()).instance_class();
         if !this_class.is_subclass_of(other_class) {
             return false;
         }
