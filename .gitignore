@@ -5,3 +5,6 @@
 /README.html
 /rt
 /jre/
+hippo.log
+.DS_Store
+.vscode/settings.json

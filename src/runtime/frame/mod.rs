@@ -9,6 +9,7 @@ use crate::runtime::method::Method;
 pub struct JvmFrame {
     pub local_variable_array: LocalVariableArray,
     pub operand_stack: OperandStack,
+    pub method: Method,
 }
 
 impl JvmFrame {
@@ -16,6 +17,7 @@ impl JvmFrame {
         JvmFrame {
             local_variable_array: LocalVariableArray::new(method.max_locals()),
             operand_stack: OperandStack::with_capacity(method.max_stack()),
+            method: method.clone(),
         }
     }
 
@@ -23,6 +25,7 @@ impl JvmFrame {
         JvmFrame {
             local_variable_array: LocalVariableArray::new_with_args(method.max_locals(), args),
             operand_stack: OperandStack::with_capacity(method.max_stack()),
+            method: method.clone(),
         }
     }
 }

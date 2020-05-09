@@ -23,7 +23,11 @@ pub enum Class {
 
 impl Display for Class {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Class::InstanceClass(i) => write!(f, "InstanceClass{{{}}}", i),
+            Class::ObjArrayClass(i) => write!(f, "ObjArrayClass{{{}}}", i.class),
+            Class::TypeArrayClass(i) => write!(f, "ObjArrayClass{{{}}}", i.ty),
+        }
     }
 }
 

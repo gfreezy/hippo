@@ -56,12 +56,11 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
     let is_native = method.is_native();
     let class = jenv.load_and_init_class(method.class_name());
 
-    let span = tracing::debug_span!("execute_method", %class, %method, is_native);
+    let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();
 
     if is_native {
         execute_native_method(jenv, &class, method, args);
-
         return;
     }
 
@@ -75,7 +74,6 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             pc = code_reader.pc(),
             opcode = opcode::show_opcode(code),
             ?frame,
-            ?jenv.heap,
             "will execute"
         );
         match code {
@@ -352,6 +350,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::INSTANCEOF => {
                 instanceof(jenv, &mut code_reader, &class);
             }
+            opcode::ATHROW => {
+                athrow(jenv, &mut code_reader, &class);
+            }
             opcode::MONITORENTER | opcode::MONITOREXIT => {}
             op => unimplemented!("{}", show_opcode(op)),
         }
@@ -407,16 +408,28 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
             sun_misc_VM_initalize(jenv, class, args);
         }
         ("sun/misc/Unsafe", "registerNatives", "()V") => {
-            sun_misc_VM_initalize(jenv, class, args);
+            sun_misc_Unsafe_registerNatives(jenv, class, args);
         }
         ("sun/misc/Unsafe", "arrayBaseOffset", "(Ljava/lang/Class;)I") => {
-            sun_misc_VM_initalize(jenv, class, args);
+            sun_misc_Unsafe_arrayBaseOffset(jenv, class, args);
+        }
+        ("sun/misc/Unsafe", "arrayIndexScale", "(Ljava/lang/Class;)I") => {
+            sun_misc_Unsafe_arrayIndexScale(jenv, class, args);
+        }
+        ("sun/misc/Unsafe", "addressSize", "()I") => {
+            sun_misc_Unsafe_addressSize(jenv, class, args);
+        }
+        ("sun/reflect/Reflection", "getCallerClass", "()Ljava/lang/Class;") => {
+            sun_reflect_Reflection_getCallerClass(jenv, class, args);
         }
         ("java/io/FileInputStream", "initIDs", "()V") => {
-            sun_misc_VM_initalize(jenv, class, args);
+            java_io_FileInputStream_initIDs(jenv, class, args);
         }
         ("java/io/FileDescriptor", "initIDs", "()V") => {
-            sun_misc_VM_initalize(jenv, class, args);
+            java_io_FileDescriptor_initIDs(jenv, class, args);
+        }
+        ("java/lang/Throwable", "fillInStackTrace", "(I)Ljava/lang/Throwable;") => {
+            java_lang_Throwable_fillInStackTrace(jenv, class, args);
         }
         (class_name, name, descriptor) => {
             panic!("native method: {}:{}, {}", class_name, name, descriptor);

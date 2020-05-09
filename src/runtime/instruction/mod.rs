@@ -528,11 +528,7 @@ pub fn invokespecial(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Cl
     args.push(object_ref);
     args.reverse();
 
-    if !actual_method.is_native() {
-        execute_method(jenv, actual_method, args);
-    } else {
-        debug!(method = %actual_method, class = actual_method.class_name(), "invokespecial");
-    }
+    execute_method(jenv, actual_method, args);
 }
 
 pub fn putfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
@@ -590,166 +586,166 @@ pub fn getfield(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) 
 
 pub fn ifge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value >= 0 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn ifgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value > 0 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn ifle(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value <= 0 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 == value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 != value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_acmpne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop();
     let value1 = frame.operand_stack.pop();
     if value1 != value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_acmpeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop();
     let value1 = frame.operand_stack.pop();
     if value1 == value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmplt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 < value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmple(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 <= value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpgt(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 > value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn if_icmpge(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value2 = frame.operand_stack.pop_integer();
     let value1 = frame.operand_stack.pop_integer();
     if value1 >= value2 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn ifeq(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value == 0 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn ifne(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop_integer();
     if value != 0 {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn ifnonnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop();
     if value != Operand::Null {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 
 pub fn ifnull(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let value = frame.operand_stack.pop();
     if value == Operand::Null {
-        code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+        code_reader.set_pc((pc as i32 - 1 + offset) as usize);
     }
 }
 pub fn goto(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let pc = code_reader.pc();
-    let offset = code_reader.read_i16().unwrap();
+    let offset = code_reader.read_i16().unwrap() as i32;
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
-    code_reader.set_pc((pc as i16 - 1 + offset) as usize);
+    code_reader.set_pc((pc as i32 - 1 + offset) as usize);
 }
 
 pub fn i2f(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
@@ -861,6 +857,27 @@ pub fn isub(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
 }
 
 pub fn instanceof(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
+    let index = code_reader.read_u16().unwrap();
+    let class_name = class.constant_pool().get_class_name_at(index);
+    let class = jenv.load_and_init_class(class_name);
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let obj_ref = frame.operand_stack.pop();
+    if obj_ref == Operand::Null {
+        frame.operand_stack.push_integer(0);
+        return;
+    }
+    let obj_class_name = jenv.heap.get_class_name(&obj_ref);
+    let obj_class = jenv.load_and_init_class(&obj_class_name);
+    let v = if can_cast_to(jenv, obj_class, class) {
+        1
+    } else {
+        0
+    };
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push_integer(v);
+}
+
+pub fn athrow(jenv: &mut JvmEnv, code_reader: &mut CodeReader, class: &Class) {
     let index = code_reader.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = jenv.load_and_init_class(class_name);

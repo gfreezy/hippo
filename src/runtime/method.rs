@@ -10,7 +10,7 @@ use crate::runtime::jvm_env::JvmPC;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Method {
     inner: Arc<InnerMethod>,
 }
@@ -194,6 +194,12 @@ impl Method {
 }
 
 impl fmt::Display for Method {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+impl fmt::Debug for Method {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
     }

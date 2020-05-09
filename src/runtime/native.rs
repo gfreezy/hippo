@@ -1,5 +1,4 @@
-#![allow(non_snake_case)]
-
+#![allow(non_snake_case, unused_variables)]
 use crate::runtime::class::Class;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
@@ -92,18 +91,79 @@ pub fn java_lang_Object_hashCode(jenv: &mut JvmEnv, _class: &Class, args: Vec<Op
         .push_integer(obj.hash_code());
 }
 
-pub fn java_lang_System_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
-    // TODO:
+pub fn java_lang_System_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+
+pub fn java_lang_Object_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+
+pub fn java_lang_Class_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+
+pub fn sun_misc_VM_initalize(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+
+pub fn sun_misc_Unsafe_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+
+pub fn sun_misc_Unsafe_arrayBaseOffset(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push_integer(0);
 }
 
-pub fn java_lang_Object_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
-    // TODO:
+pub fn sun_misc_Unsafe_arrayIndexScale(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push_integer(1);
 }
 
-pub fn java_lang_Class_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
-    // TODO:
+pub fn sun_misc_Unsafe_addressSize(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push_integer(8);
 }
 
-pub fn sun_misc_VM_initalize(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
-    // TODO:
+pub fn sun_reflect_Reflection_getCallerClass(
+    jenv: &mut JvmEnv,
+    _class: &Class,
+    args: Vec<Operand>,
+) {
+    let frames = &jenv.thread.stack.frames;
+    let len = frames.len();
+    let caller_class = if len >= 2 {
+        let frame = &frames[len - 2];
+        let class_name = frame.method.class_name().to_string();
+        let class_object = jenv.heap.new_class_object(class_name);
+        Operand::ObjectRef(class_object)
+    } else {
+        Operand::Null
+    };
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push(caller_class);
+}
+
+pub fn java_io_FileInputStream_initIDs(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+pub fn java_io_FileDescriptor_initIDs(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+pub fn java_lang_Throwable_fillInStackTrace(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {
+    let obj = &args[0];
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push(obj.clone());
 }
