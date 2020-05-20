@@ -275,6 +275,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::IFGT => {
                 ifgt(jenv, &class);
             }
+            opcode::IFLT => {
+                iflt(jenv, &class);
+            }
             opcode::IFLE => {
                 ifle(jenv, &class);
             }
@@ -435,7 +438,10 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
             java_lang_Object_registerNatives(jenv, class, args);
         }
         ("java/lang/Class", "registerNatives", "()V") => {
-            java_lang_Class_registerNatives(jenv, class, args);
+            registerNatives(jenv, class, args);
+        }
+        ("java/lang/Thread", "registerNatives", "()V") => {
+            registerNatives(jenv, class, args);
         }
         ("sun/misc/VM", "initialize", "()V") => {
             sun_misc_VM_initalize(jenv, class, args);

@@ -37,22 +37,14 @@ enum Memory {
     },
 }
 
-pub enum Object {
-    Class {
-        class_name: String,
-    },
-    Object {
-        class: InstanceClass,
-        fields: Vec<Operand>,
-    },
+pub struct Object {
+    class: InstanceClass,
+    fields: Vec<Operand>,
 }
 
 impl Debug for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Object::Class { class_name } => write!(f, "Class {{{}}}", class_name),
-            Object::Object { class, .. } => write!(f, "Object {{ class: {}}}", class.name(),),
-        }
+        write!(f, "Object {{ class: {}}}", self.class.name())
     }
 }
 
@@ -64,37 +56,23 @@ impl Object {
         for field in all_fields {
             fields.push(field.default_value())
         }
-        Object::Object { class, fields }
+        Object { class, fields }
     }
 
     pub fn class_name(&self) -> &str {
-        match self {
-            Object::Class { .. } => CLASS_CLASS_NAME,
-            Object::Object { class, .. } => class.name(),
-        }
+        self.class.name()
     }
 
     pub fn set_field(&mut self, idx: usize, value: Operand) {
-        match self {
-            Object::Class { .. } => unreachable!(),
-            Object::Object { fields, .. } => fields[idx] = value,
-        };
+        self.fields[idx] = value;
     }
 
     pub fn get_field(&self, idx: usize) -> &Operand {
-        match self {
-            Object::Object { fields, .. } => &fields[idx],
-            Object::Class { .. } => &Operand::Null,
-        }
+        &self.fields[idx]
     }
 
     pub fn print_fields(&self) {
-        match self {
-            Object::Object { class: _, fields } => {
-                dbg!(fields);
-            }
-            Object::Class { class_name: _ } => {}
-        };
+        dbg!(&self.fields);
     }
 }
 

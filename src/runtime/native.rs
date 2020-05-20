@@ -95,7 +95,7 @@ pub fn java_lang_System_registerNatives(jenv: &mut JvmEnv, _class: &Class, args:
 
 pub fn java_lang_Object_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
 
-pub fn java_lang_Class_registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+pub fn registerNatives(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
 
 pub fn sun_misc_VM_initalize(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
 

@@ -75,7 +75,7 @@ impl JvmEnv {
         obj_ref
     }
 
-    pub fn new_java_class(&mut self, s: &str) -> u32 {
+    pub fn new_java_class(&mut self, _s: &str) -> u32 {
         let class = self.load_and_init_class(CLASS_CLASS_NAME);
         let obj_ref = self.heap.new_object(class);
         obj_ref

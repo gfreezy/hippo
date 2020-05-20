@@ -631,6 +631,16 @@ pub fn ifgt(jenv: &mut JvmEnv, class: &Class) {
     }
 }
 
+pub fn iflt(jenv: &mut JvmEnv, class: &Class) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let pc = frame.pc();
+    let offset = frame.read_i16().unwrap() as i32;
+    let value = frame.operand_stack.pop_integer();
+    if value < 0 {
+        frame.set_pc((pc as i32 - 1 + offset) as usize);
+    }
+}
+
 pub fn ifle(jenv: &mut JvmEnv, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let pc = frame.pc();
