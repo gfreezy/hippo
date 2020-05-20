@@ -23,10 +23,6 @@ impl CodeReader {
         code
     }
 
-    pub fn method(&mut self) -> Method {
-        self.method.clone()
-    }
-
     pub fn read_u16(&mut self) -> Option<u16> {
         let byte1 = *self.code.get(self.pc as usize)? as u16;
         self.pc += 1;

@@ -5,6 +5,7 @@ use crate::class_parser::{
     is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
     ACC_STATIC, ACC_VARARGS,
 };
+use crate::runtime::class::Class;
 use crate::runtime::cp_cache::CpCache;
 use crate::runtime::jvm_env::JvmPC;
 use std::fmt;
@@ -98,6 +99,10 @@ impl Method {
         }
     }
 
+    pub fn resolve_static_field(&self, pc: JvmPC) -> Option<(Class, usize)> {
+        self.inner.cp_cache.lock().unwrap().resolve_static_field(pc)
+    }
+
     pub fn resolve_field(&self, pc: JvmPC) -> Option<usize> {
         self.inner.cp_cache.lock().unwrap().resolve_field(pc)
     }
@@ -108,6 +113,14 @@ impl Method {
             .lock()
             .unwrap()
             .set_field(pc, field_index)
+    }
+
+    pub fn set_static_field(&self, pc: JvmPC, class: Class, field_index: usize) {
+        self.inner
+            .cp_cache
+            .lock()
+            .unwrap()
+            .set_static_field(pc, class, field_index)
     }
 
     pub fn n_args(&self) -> usize {

@@ -11,7 +11,7 @@ pub fn java_lang_Class_getPrimitiveClass(
 ) {
     let string_ref = args.pop().unwrap();
     let class_name = jenv.get_java_string(&string_ref);
-    let obj_ref = jenv.heap.new_class_object(class_name);
+    let obj_ref = jenv.new_java_class(&class_name);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::ObjectRef(obj_ref));
 }
@@ -141,7 +141,7 @@ pub fn sun_reflect_Reflection_getCallerClass(
     let caller_class = if len >= 2 {
         let frame = &frames[len - 2];
         let class_name = frame.method.class_name().to_string();
-        let class_object = jenv.heap.new_class_object(class_name);
+        let class_object = jenv.new_java_class(&class_name);
         Operand::ObjectRef(class_object)
     } else {
         Operand::Null
@@ -166,4 +166,20 @@ pub fn java_lang_Throwable_fillInStackTrace(jenv: &mut JvmEnv, _class: &Class, a
         .unwrap()
         .operand_stack
         .push(obj.clone());
+}
+
+pub fn java_io_FileOutputStream_initIDs(jenv: &mut JvmEnv, _class: &Class, args: Vec<Operand>) {}
+
+pub fn java_security_AccessController_doPrivileged(
+    jenv: &mut JvmEnv,
+    class: &Class,
+    args: Vec<Operand>,
+) {
+    let action = &args[0];
+    let class_name = jenv.heap.get_class_name(action);
+    let class = jenv.load_and_init_class(&class_name);
+    let method = class
+        .get_method("run", "()Ljava/lang/Object;", false)
+        .unwrap();
+    execute_method(jenv, method, vec![action.clone()])
 }

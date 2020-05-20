@@ -12,7 +12,6 @@ mod native;
 mod opcode;
 
 use crate::runtime::class::{Class, InstanceClass};
-use crate::runtime::code_reader::CodeReader;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
 use crate::runtime::instruction::*;
@@ -20,6 +19,7 @@ use crate::runtime::jvm_env::JvmEnv;
 use crate::runtime::method::Method;
 use crate::runtime::native::*;
 use crate::runtime::opcode::show_opcode;
+use std::panic;
 use tracing::debug;
 
 #[derive(Debug)]
@@ -28,6 +28,25 @@ pub struct Jvm {
     main_class: String,
 }
 
+impl Drop for Jvm {
+    fn drop(&mut self) {
+        eprintln!("heap: {:?}", self.jenv.heap);
+        eprintln!("backtraces:");
+        for frame in &self.jenv.thread.stack.frames {
+            eprintln!(
+                "{}.{}:{}, pc={}",
+                frame.method.class_name(),
+                frame.method.name(),
+                frame.method.descriptor(),
+                frame.pc() - 1
+            );
+            eprintln!(
+                "locals: {:?}\noperand_stack:{:?}",
+                frame.local_variable_array, frame.operand_stack,
+            );
+        }
+    }
+}
 impl Jvm {
     pub fn new(class_name: &str, jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
         let mut jvm = Jvm {
@@ -67,291 +86,305 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
     let frame = JvmFrame::new_with_args(&method, args);
     jenv.thread.stack.frames.push_back(frame);
 
-    let mut code_reader = CodeReader::new(method);
-    while let Some(code) = code_reader.read_u8() {
+    while let Some(code) = jenv.thread.stack.frames.back_mut().unwrap().read_u8() {
         let frame = jenv.thread.stack.frames.back().unwrap();
         debug!(
-            pc = code_reader.pc(),
+            pc = frame.pc() - 1,
             opcode = opcode::show_opcode(code),
             ?frame,
             "will execute"
         );
         match code {
             opcode::ICONST_0 => {
-                iconst_n(jenv, &mut code_reader, &class, 0);
+                iconst_n(jenv, &class, 0);
             }
             opcode::ICONST_1 => {
-                iconst_n(jenv, &mut code_reader, &class, 1);
+                iconst_n(jenv, &class, 1);
             }
             opcode::ICONST_2 => {
-                iconst_n(jenv, &mut code_reader, &class, 2);
+                iconst_n(jenv, &class, 2);
             }
             opcode::ICONST_3 => {
-                iconst_n(jenv, &mut code_reader, &class, 3);
+                iconst_n(jenv, &class, 3);
             }
             opcode::ICONST_4 => {
-                iconst_n(jenv, &mut code_reader, &class, 4);
+                iconst_n(jenv, &class, 4);
             }
             opcode::ICONST_5 => {
-                iconst_n(jenv, &mut code_reader, &class, 5);
+                iconst_n(jenv, &class, 5);
             }
             opcode::FCONST_0 => {
-                fconst_n(jenv, &mut code_reader, &class, 0.0);
+                fconst_n(jenv, &class, 0.0);
             }
             opcode::FCONST_1 => {
-                fconst_n(jenv, &mut code_reader, &class, 1.0);
+                fconst_n(jenv, &class, 1.0);
             }
             opcode::FCONST_2 => {
-                fconst_n(jenv, &mut code_reader, &class, 2.0);
+                fconst_n(jenv, &class, 2.0);
             }
-            opcode::LDC => ldc(jenv, &mut code_reader, &class),
-            opcode::ISTORE_0 | opcode::ASTORE_0 => {
-                store_n(jenv, &mut code_reader, &class, 0);
+            opcode::LDC => ldc(jenv, &class),
+            opcode::ISTORE_0 => {
+                istore_n(jenv, &class, 0);
             }
-            opcode::ISTORE_1 | opcode::ASTORE_1 => {
-                store_n(jenv, &mut code_reader, &class, 1);
+            opcode::ISTORE_1 => {
+                istore_n(jenv, &class, 1);
             }
-            opcode::ISTORE_2 | opcode::ASTORE_2 => {
-                store_n(jenv, &mut code_reader, &class, 2);
+            opcode::ISTORE_2 => {
+                istore_n(jenv, &class, 2);
             }
-            opcode::ISTORE_3 | opcode::ASTORE_3 => {
-                store_n(jenv, &mut code_reader, &class, 3);
+            opcode::ISTORE_3 => {
+                istore_n(jenv, &class, 3);
             }
-            opcode::ISTORE | opcode::ASTORE => {
-                store(jenv, &mut code_reader, &class);
+            opcode::ISTORE => {
+                istore(jenv, &class);
+            }
+            opcode::ASTORE_0 => {
+                astore_n(jenv, &class, 0);
+            }
+            opcode::ASTORE_1 => {
+                astore_n(jenv, &class, 1);
+            }
+            opcode::ASTORE_2 => {
+                astore_n(jenv, &class, 2);
+            }
+            opcode::ASTORE_3 => {
+                astore_n(jenv, &class, 3);
+            }
+            opcode::ASTORE => {
+                astore(jenv, &class);
             }
             opcode::AASTORE => {
-                aastore(jenv, &mut code_reader, &class);
+                aastore(jenv, &class);
             }
             opcode::BIPUSH => {
                 let frame = jenv.thread.stack.frames.back_mut().unwrap();
-                let byte = code_reader.read_u8().unwrap();
+                let byte = frame.read_u8().unwrap();
                 frame.operand_stack.push_integer(byte as i32);
             }
             opcode::ILOAD_0 => {
-                iload_n(jenv, &mut code_reader, &class, 0);
+                iload_n(jenv, &class, 0);
             }
             opcode::ILOAD_1 => {
-                iload_n(jenv, &mut code_reader, &class, 1);
+                iload_n(jenv, &class, 1);
             }
             opcode::ILOAD_2 => {
-                iload_n(jenv, &mut code_reader, &class, 2);
+                iload_n(jenv, &class, 2);
             }
             opcode::ILOAD_3 => {
-                iload_n(jenv, &mut code_reader, &class, 3);
+                iload_n(jenv, &class, 3);
             }
             opcode::ALOAD_0 => {
-                aload_n(jenv, &mut code_reader, &class, 0);
+                aload_n(jenv, &class, 0);
             }
             opcode::ALOAD_1 => {
-                aload_n(jenv, &mut code_reader, &class, 1);
+                aload_n(jenv, &class, 1);
             }
             opcode::ALOAD_2 => {
-                aload_n(jenv, &mut code_reader, &class, 2);
+                aload_n(jenv, &class, 2);
             }
             opcode::ALOAD_3 => {
-                aload_n(jenv, &mut code_reader, &class, 3);
+                aload_n(jenv, &class, 3);
             }
             opcode::ALOAD => {
-                aload(jenv, &mut code_reader, &class);
+                aload(jenv, &class);
             }
             opcode::AALOAD => {
-                aaload(jenv, &mut code_reader, &class);
+                aaload(jenv, &class);
             }
             opcode::FLOAD_0 => {
-                fload_n(jenv, &mut code_reader, &class, 0);
+                fload_n(jenv, &class, 0);
             }
             opcode::FLOAD_1 => {
-                fload_n(jenv, &mut code_reader, &class, 1);
+                fload_n(jenv, &class, 1);
             }
             opcode::FLOAD_2 => {
-                fload_n(jenv, &mut code_reader, &class, 2);
+                fload_n(jenv, &class, 2);
             }
             opcode::FLOAD_3 => {
-                fload_n(jenv, &mut code_reader, &class, 3);
+                fload_n(jenv, &class, 3);
             }
             opcode::IADD => {
-                iadd(jenv, &mut code_reader, &class);
+                iadd(jenv, &class);
             }
             opcode::IREM => {
-                irem(jenv, &mut code_reader, &class);
+                irem(jenv, &class);
             }
             opcode::INVOKESTATIC => {
-                invokestatic(jenv, &mut code_reader, &class);
+                invokestatic(jenv, &class);
             }
             opcode::IRETURN => {
-                ireturn(jenv, &mut code_reader, &class);
+                ireturn(jenv, &class);
                 break;
             }
             opcode::DRETURN => {
-                dreturn(jenv, &mut code_reader, &class);
+                dreturn(jenv, &class);
                 break;
             }
             opcode::FRETURN => {
-                freturn(jenv, &mut code_reader, &class);
+                freturn(jenv, &class);
                 break;
             }
             opcode::ARETURN => {
-                areturn(jenv, &mut code_reader, &class);
+                areturn(jenv, &class);
                 break;
             }
             opcode::RETURN => {
-                return_(jenv, &mut code_reader, &class);
+                return_(jenv, &class);
                 break;
             }
             opcode::NOP => {}
             opcode::GETSTATIC => {
-                getstatic(jenv, &mut code_reader, &class);
+                getstatic(jenv, &class);
             }
             opcode::ACONST_NULL => {
-                aconst_null(jenv, &mut code_reader, &class);
+                aconst_null(jenv, &class);
             }
             opcode::PUTSTATIC => {
-                putstatic(jenv, &mut code_reader, &class);
+                putstatic(jenv, &class);
             }
             opcode::INVOKEVIRTUAL => {
-                invokevirtual(jenv, &mut code_reader, &class);
+                invokevirtual(jenv, &class);
             }
             opcode::INVOKEINTERFACE => {
-                invokeinterface(jenv, &mut code_reader, &class);
+                invokeinterface(jenv, &class);
             }
             opcode::NEW => {
-                new(jenv, &mut code_reader, &class);
+                new(jenv, &class);
             }
             opcode::NEWARRAY => {
-                newarray(jenv, &mut code_reader, &class);
+                newarray(jenv, &class);
             }
             opcode::DUP => {
-                dup(jenv, &mut code_reader, &class);
+                dup(jenv, &class);
             }
             opcode::CASTORE => {
-                castore(jenv, &mut code_reader, &class);
+                castore(jenv, &class);
             }
             opcode::INVOKESPECIAL => {
-                invokespecial(jenv, &mut code_reader, &class);
+                invokespecial(jenv, &class);
             }
             opcode::PUTFIELD => {
-                putfield(jenv, &mut code_reader, &class);
+                putfield(jenv, &class);
             }
             opcode::GETFIELD => {
-                getfield(jenv, &mut code_reader, &class);
+                getfield(jenv, &class);
             }
             opcode::IFGE => {
-                ifge(jenv, &mut code_reader, &class);
+                ifge(jenv, &class);
             }
             opcode::IFGT => {
-                ifgt(jenv, &mut code_reader, &class);
+                ifgt(jenv, &class);
             }
             opcode::IFLE => {
-                ifle(jenv, &mut code_reader, &class);
+                ifle(jenv, &class);
             }
             opcode::IFEQ => {
-                ifeq(jenv, &mut code_reader, &class);
+                ifeq(jenv, &class);
             }
             opcode::IFNE => {
-                ifne(jenv, &mut code_reader, &class);
+                ifne(jenv, &class);
             }
             opcode::IFNONNULL => {
-                ifnonnull(jenv, &mut code_reader, &class);
+                ifnonnull(jenv, &class);
             }
             opcode::IFNULL => {
-                ifnull(jenv, &mut code_reader, &class);
+                ifnull(jenv, &class);
             }
             opcode::IF_ICMPEQ => {
-                if_icmpeq(jenv, &mut code_reader, &class);
+                if_icmpeq(jenv, &class);
             }
             opcode::IF_ICMPGE => {
-                if_icmpge(jenv, &mut code_reader, &class);
+                if_icmpge(jenv, &class);
             }
             opcode::IF_ICMPGT => {
-                if_icmpgt(jenv, &mut code_reader, &class);
+                if_icmpgt(jenv, &class);
             }
             opcode::IF_ICMPLE => {
-                if_icmple(jenv, &mut code_reader, &class);
+                if_icmple(jenv, &class);
             }
             opcode::IF_ICMPLT => {
-                if_icmplt(jenv, &mut code_reader, &class);
+                if_icmplt(jenv, &class);
             }
             opcode::IF_ICMPNE => {
-                if_icmpne(jenv, &mut code_reader, &class);
+                if_icmpne(jenv, &class);
             }
             opcode::IF_ACMPNE => {
-                if_acmpne(jenv, &mut code_reader, &class);
+                if_acmpne(jenv, &class);
             }
             opcode::I2F => {
-                i2f(jenv, &mut code_reader, &class);
+                i2f(jenv, &class);
             }
             opcode::F2I => {
-                f2i(jenv, &mut code_reader, &class);
+                f2i(jenv, &class);
             }
             opcode::I2L => {
-                i2l(jenv, &mut code_reader, &class);
+                i2l(jenv, &class);
             }
             opcode::FMUL => {
-                fmul(jenv, &mut code_reader, &class);
+                fmul(jenv, &class);
             }
             opcode::FCMPG | opcode::FCMPL => {
-                fcmpg(jenv, &mut code_reader, &class);
+                fcmpg(jenv, &class);
             }
             opcode::ANEWARRAY => {
-                anewarray(jenv, &mut code_reader, &class);
+                anewarray(jenv, &class);
             }
             opcode::GOTO => {
-                goto(jenv, &mut code_reader, &class);
+                goto(jenv, &class);
             }
             opcode::LDC2_W => {
-                ldc2_w(jenv, &mut code_reader, &class);
+                ldc2_w(jenv, &class);
             }
             opcode::SIPUSH => {
-                sipush(jenv, &mut code_reader, &class);
+                sipush(jenv, &class);
             }
             opcode::LADD => {
-                ladd(jenv, &mut code_reader, &class);
+                ladd(jenv, &class);
             }
             opcode::LSHL => {
-                lshl(jenv, &mut code_reader, &class);
+                lshl(jenv, &class);
             }
             opcode::ISHL => {
-                ishl(jenv, &mut code_reader, &class);
+                ishl(jenv, &class);
             }
             opcode::IUSHR => {
-                iushr(jenv, &mut code_reader, &class);
+                iushr(jenv, &class);
             }
             opcode::IXOR => {
-                ixor(jenv, &mut code_reader, &class);
+                ixor(jenv, &class);
             }
             opcode::LAND => {
-                land(jenv, &mut code_reader, &class);
+                land(jenv, &class);
             }
             opcode::IAND => {
-                iand(jenv, &mut code_reader, &class);
+                iand(jenv, &class);
             }
             opcode::ISUB => {
-                isub(jenv, &mut code_reader, &class);
+                isub(jenv, &class);
             }
             opcode::ILOAD => {
-                iload(jenv, &mut code_reader, &class);
+                iload(jenv, &class);
             }
             opcode::IINC => {
-                iinc(jenv, &mut code_reader, &class);
+                iinc(jenv, &class);
             }
             opcode::ARRAYLENGTH => {
-                arraylength(jenv, &mut code_reader, &class);
+                arraylength(jenv, &class);
             }
             opcode::POP => {
-                pop(jenv, &mut code_reader, &class);
+                pop(jenv, &class);
             }
             opcode::CHECKCAST => {
-                checkcast(jenv, &mut code_reader, &class);
+                checkcast(jenv, &class);
             }
             opcode::DUP_X1 => {
-                dup_x1(jenv, &mut code_reader, &class);
+                dup_x1(jenv, &class);
             }
             opcode::INSTANCEOF => {
-                instanceof(jenv, &mut code_reader, &class);
+                instanceof(jenv, &class);
             }
             opcode::ATHROW => {
-                athrow(jenv, &mut code_reader, &class);
+                athrow(jenv, &class);
             }
             opcode::MONITORENTER | opcode::MONITOREXIT => {}
             op => unimplemented!("{}", show_opcode(op)),
@@ -430,6 +463,23 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
         }
         ("java/lang/Throwable", "fillInStackTrace", "(I)Ljava/lang/Throwable;") => {
             java_lang_Throwable_fillInStackTrace(jenv, class, args);
+        }
+        ("java/io/FileOutputStream", "initIDs", "()V") => {
+            java_io_FileOutputStream_initIDs(jenv, class, args);
+        }
+        (
+            "java/security/AccessController",
+            "doPrivileged",
+            "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
+        ) => {
+            java_security_AccessController_doPrivileged(jenv, class, args);
+        }
+        (
+            "java/security/AccessController",
+            "doPrivileged",
+            "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
+        ) => {
+            java_security_AccessController_doPrivileged(jenv, class, args);
         }
         (class_name, name, descriptor) => {
             panic!("native method: {}:{}, {}", class_name, name, descriptor);

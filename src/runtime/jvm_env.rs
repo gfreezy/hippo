@@ -4,7 +4,7 @@ use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::frame::JvmFrame;
-use crate::runtime::heap::{JvmHeap, STRING_CLASS_NAME};
+use crate::runtime::heap::{JvmHeap, CLASS_CLASS_NAME, STRING_CLASS_NAME};
 use crate::runtime::method::Method;
 use std::collections::VecDeque;
 use tracing::{debug, debug_span};
@@ -72,6 +72,12 @@ impl JvmEnv {
         let object = self.heap.get_object_mut(&Operand::ObjectRef(obj_ref));
         object.set_field(JAVA_STRING_FIELD_VALUE_INDEX, Operand::ArrayRef(array));
         object.set_field(JAVA_STRING_FIELD_HASH_INDEX, Operand::Int(obj_ref as i32));
+        obj_ref
+    }
+
+    pub fn new_java_class(&mut self, s: &str) -> u32 {
+        let class = self.load_and_init_class(CLASS_CLASS_NAME);
+        let obj_ref = self.heap.new_object(class);
         obj_ref
     }
 

@@ -16,6 +16,7 @@ tracing = "0.1"
 tracing-subscriber = "0.2"
 tracing-appender = "0.1"
 lazy_static = "1.4"
+derivative = "2.1"
 
 [dev-dependencies]
 insta = "0.12"

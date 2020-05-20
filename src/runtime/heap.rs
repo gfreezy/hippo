@@ -3,7 +3,6 @@ use crate::runtime::frame::operand_stack::Operand;
 use std::fmt;
 use std::fmt::Debug;
 
-#[derive(Debug)]
 pub struct JvmHeap {
     mem: Vec<Memory>,
 }
@@ -68,10 +67,6 @@ impl Object {
         Object::Object { class, fields }
     }
 
-    pub fn new_class(class_name: String) -> Self {
-        Object::Class { class_name }
-    }
-
     pub fn class_name(&self) -> &str {
         match self {
             Object::Class { .. } => CLASS_CLASS_NAME,
@@ -116,19 +111,11 @@ impl JvmHeap {
         obj_ref as u32
     }
 
-    pub fn new_class_object(&mut self, class_name: String) -> u32 {
-        self.alloc(Memory::Object(Object::new_class(class_name)))
-    }
-
     pub fn new_object(&mut self, class: Class) -> u32 {
         match class {
-            Class::InstanceClass(class) => self.new_instance_object(class),
+            Class::InstanceClass(class) => self.alloc(Memory::Object(Object::new_object(class))),
             _ => unreachable!(),
         }
-    }
-
-    pub fn new_instance_object(&mut self, class: InstanceClass) -> u32 {
-        self.alloc(Memory::Object(Object::new_object(class)))
     }
 
     pub fn new_empty_array(&mut self, ty: u8, count: i32) -> u32 {
@@ -332,5 +319,14 @@ impl JvmHeap {
             },
             v => unreachable!("{:?}", v),
         }
+    }
+}
+
+impl Debug for JvmHeap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, item) in self.mem.iter().enumerate() {
+            write!(f, "{}: {:?}, ", i, item)?;
+        }
+        Ok(())
     }
 }
