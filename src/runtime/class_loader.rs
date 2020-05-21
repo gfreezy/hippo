@@ -1,7 +1,6 @@
 use crate::class_parser::parse_class_file;
 use crate::class_path::ClassPath;
 use crate::runtime::class::{Class, InstanceClass, ObjArrayClass, TypeArrayClass};
-use crate::runtime::heap::OBJECT_CLASS_NAME;
 use std::collections::HashMap;
 use tracing::debug;
 
@@ -28,23 +27,23 @@ impl ClassLoader {
         } else {
             debug!(%name, "load_class");
             let name_bytes = name.as_bytes();
-            let class: Class = if name_bytes[0] == b'[' {
-                match name_bytes[1] {
-                    b'L' => {
-                        let class_name =
-                            std::str::from_utf8(&name_bytes[2..name_bytes.len() - 1]).unwrap();
-                        Class::ObjArrayClass(ObjArrayClass {
-                            class: class_name.to_string(),
-                        })
-                    }
-                    ty => Class::TypeArrayClass(TypeArrayClass { ty }),
+            let class = match name_bytes {
+                [b'[', .., b'L'] => {
+                    let class_name =
+                        std::str::from_utf8(&name_bytes[2..name_bytes.len() - 1]).unwrap();
+                    Class::ObjArrayClass(ObjArrayClass {
+                        class: class_name.to_string(),
+                    })
                 }
-            } else {
-                let data = self
-                    .class_path
-                    .read_class(name)
-                    .unwrap_or_else(|_| panic!("read class file: {}", name));
-                self.define_class(name.to_string(), data).into()
+                [b'[', ty, ..] => Class::TypeArrayClass(TypeArrayClass { ty: *ty }),
+                [b'L', name_slice @ .., b';'] | name_slice => {
+                    let name = std::str::from_utf8(name_slice).unwrap();
+                    let data = self
+                        .class_path
+                        .read_class(name)
+                        .unwrap_or_else(|_| panic!("read class file: {}", name));
+                    self.define_class(name.to_string(), data).into()
+                }
             };
             self.classes.insert(name.to_string(), class.clone());
             class
@@ -70,11 +69,6 @@ impl ClassLoader {
             interfaces.push(self.load_class(interface_name).instance_class());
         }
 
-        let object_class = if name == OBJECT_CLASS_NAME {
-            Some(self.load_class("java/lang/Object").instance_class())
-        } else {
-            None
-        };
-        InstanceClass::new(name, class_file, super_class, interfaces, object_class)
+        InstanceClass::new(name, class_file, super_class, interfaces)
     }
 }

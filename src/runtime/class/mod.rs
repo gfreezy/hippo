@@ -59,6 +59,9 @@ impl Class {
         }
     }
 
+    pub fn set_mirror_class_name(&self, name: String) {
+        self.instance_class_ref().set_mirror_class_name(name)
+    }
     pub fn is_interface(&self) -> bool {
         self.instance_class_ref().is_interface()
     }
@@ -142,9 +145,18 @@ impl Class {
     }
 
     pub fn name(&self) -> &str {
-        self.instance_class_ref().name()
+        match self {
+            Class::InstanceClass(i) => i.name(),
+            _ => unreachable!(),
+        }
     }
 
+    pub fn mirror_class_name(&self) -> String {
+        match self {
+            Class::InstanceClass(i) => i.mirror_class_name(),
+            _ => unreachable!(),
+        }
+    }
     pub fn main_method(&self) -> Option<Method> {
         self.instance_class_ref().main_method()
     }

@@ -203,6 +203,9 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::FLOAD_3 => {
                 fload_n(jenv, &class, 3);
             }
+            opcode::CALOAD => {
+                caload(jenv, &class);
+            }
             opcode::IADD => {
                 iadd(jenv, &class);
             }
@@ -487,8 +490,24 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
         ) => {
             java_security_AccessController_doPrivileged(jenv, class, args);
         }
+        ("java/lang/Thread", "currentThread", "()Ljava/lang/Thread;") => {
+            java_lang_Thread_currentThread(jenv, class, args);
+        }
+        ("java/lang/Class", "getName0", "()Ljava/lang/String;") => {
+            java_lang_Class_getName0(jenv, class, args);
+        }
+        (
+            "java/lang/Class",
+            "forName0",
+            "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Class;",
+        ) => {
+            // todo:
+        }
         (class_name, name, descriptor) => {
-            panic!("native method: {}:{}, {}", class_name, name, descriptor);
+            panic!(
+                r#"native method: ("{}", "{}", "{}")"#,
+                class_name, name, descriptor
+            );
         }
     };
 }

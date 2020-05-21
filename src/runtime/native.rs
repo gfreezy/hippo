@@ -11,9 +11,9 @@ pub fn java_lang_Class_getPrimitiveClass(
 ) {
     let string_ref = args.pop().unwrap();
     let class_name = jenv.get_java_string(&string_ref);
-    let obj_ref = jenv.new_java_class(&class_name);
+    let addr = jenv.new_java_lang_class(&class_name);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
-    frame.operand_stack.push(Operand::ObjectRef(obj_ref));
+    frame.operand_stack.push(Operand::ObjectRef(addr));
 }
 
 pub fn jvm_desiredAssertionStatus0(jenv: &mut JvmEnv, _class: &Class, _args: Vec<Operand>) {
@@ -71,8 +71,8 @@ pub fn java_lang_System_initProperties(jenv: &mut JvmEnv, _class: &Class, args: 
         ("user.dir", "/Users/feichao"),
     ];
     for (key, value) in systemProperties {
-        let key = Operand::ObjectRef(jenv.new_java_string(key));
-        let value = Operand::ObjectRef(jenv.new_java_string(value));
+        let key = Operand::ObjectRef(jenv.new_java_lang_string(key));
+        let value = Operand::ObjectRef(jenv.new_java_lang_string(value));
         let args = vec![props_ref.clone(), key, value];
         execute_method(jenv, method.clone(), args);
     }
@@ -141,8 +141,8 @@ pub fn sun_reflect_Reflection_getCallerClass(
     let caller_class = if len >= 2 {
         let frame = &frames[len - 2];
         let class_name = frame.method.class_name().to_string();
-        let class_object = jenv.new_java_class(&class_name);
-        Operand::ObjectRef(class_object)
+        let addr = jenv.new_java_lang_class(&class_name);
+        Operand::ObjectRef(addr)
     } else {
         Operand::Null
     };
@@ -182,4 +182,25 @@ pub fn java_security_AccessController_doPrivileged(
         .get_method("run", "()Ljava/lang/Object;", false)
         .unwrap();
     execute_method(jenv, method, vec![action.clone()])
+}
+
+pub fn java_lang_Thread_currentThread(jenv: &mut JvmEnv, class: &Class, args: Vec<Operand>) {
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push(Operand::ObjectRef(jenv.thread.object_addr));
+}
+
+pub fn java_lang_Class_getName0(jenv: &mut JvmEnv, class: &Class, args: Vec<Operand>) {
+    let addr = jenv.new_java_lang_string(&class.mirror_class_name());
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push(Operand::ObjectRef(addr));
 }

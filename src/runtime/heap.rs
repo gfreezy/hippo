@@ -1,4 +1,4 @@
-use crate::runtime::class::{Class, InstanceClass};
+use crate::runtime::class::Class;
 use crate::runtime::frame::operand_stack::Operand;
 use std::fmt;
 use std::fmt::Debug;
@@ -16,9 +16,17 @@ const T_SHORT: u8 = 9;
 const T_INT: u8 = 10;
 const T_LONG: u8 = 11;
 
-pub const CLASS_CLASS_NAME: &str = "java/lang/Class";
-pub const STRING_CLASS_NAME: &str = "java/lang/String";
-pub const OBJECT_CLASS_NAME: &str = "java/lang/Object;";
+pub const JAVA_LANG_CLASS_DESCRIPTOR: &str = "Ljava/lang/Class;";
+pub const JAVA_LANG_STRING_DESCRIPTOR: &str = "Ljava/lang/String;";
+pub const JAVA_LANG_OBJECT_DESCRIPTOR: &str = "Ljava/lang/Object;";
+pub const JAVA_LANG_THREAD_DESCRIPTOR: &str = "Ljava/lang/Thread;";
+pub const JAVA_LANG_THREAD_GROUP_DESCRIPTOR: &str = "Ljava/lang/ThreadGroup;";
+
+pub const JAVA_LANG_CLASS: &str = "java/lang/Class";
+pub const JAVA_LANG_STRING: &str = "java/lang/String";
+pub const JAVA_LANG_OBJECT: &str = "java/lang/Object";
+pub const JAVA_LANG_THREAD: &str = "java/lang/Thread";
+pub const JAVA_LANG_THREAD_GROUP: &str = "java/lang/ThreadGroup";
 
 #[derive(Debug)]
 enum Memory {
@@ -38,18 +46,18 @@ enum Memory {
 }
 
 pub struct Object {
-    class: InstanceClass,
+    class: Class,
     fields: Vec<Operand>,
 }
 
 impl Debug for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Object {{ class: {}}}", self.class.name())
+        write!(f, "Object {{ class: {}}}", self.class)
     }
 }
 
 impl Object {
-    pub fn new_object(class: InstanceClass) -> Self {
+    pub fn new_object(class: Class) -> Self {
         let mut fields = Vec::with_capacity(class.total_instance_fields());
         let all_fields = class.all_instance_fields();
         assert_eq!(all_fields.len(), class.total_instance_fields());
@@ -67,12 +75,28 @@ impl Object {
         self.fields[idx] = value;
     }
 
+    pub fn set_field_by_name(&mut self, name: &str, descriptor: &str, value: Operand) {
+        let field = self
+            .class
+            .get_field(name, descriptor)
+            .unwrap_or_else(|| panic!("{}:{}", name, descriptor));
+        self.set_field(field.index(), value);
+    }
+
+    pub fn get_field_by_name(&self, name: &str, descriptor: &str) -> &Operand {
+        let field = self
+            .class
+            .get_field(name, descriptor)
+            .unwrap_or_else(|| panic!("{}:{}", name, descriptor));
+        self.get_field(field.index())
+    }
+
     pub fn get_field(&self, idx: usize) -> &Operand {
         &self.fields[idx]
     }
 
     pub fn print_fields(&self) {
-        dbg!(&self.fields);
+        println!("{:?}", &self.fields);
     }
 }
 
@@ -89,11 +113,9 @@ impl JvmHeap {
         obj_ref as u32
     }
 
-    pub fn new_object(&mut self, class: Class) -> u32 {
-        match class {
-            Class::InstanceClass(class) => self.alloc(Memory::Object(Object::new_object(class))),
-            _ => unreachable!(),
-        }
+    pub fn new_object(&mut self, class: Class) -> (&mut Object, u32) {
+        let addr = self.alloc(Memory::Object(Object::new_object(class)));
+        (self.get_object_mut(&Operand::ObjectRef(addr)), addr)
     }
 
     pub fn new_empty_array(&mut self, ty: u8, count: i32) -> u32 {

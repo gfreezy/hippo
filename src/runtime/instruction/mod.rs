@@ -3,7 +3,7 @@ use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::runtime::class::Class;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
-use crate::runtime::heap::OBJECT_CLASS_NAME;
+use crate::runtime::heap::JAVA_LANG_OBJECT;
 use crate::runtime::jvm_env::JvmEnv;
 use tracing::debug;
 
@@ -32,15 +32,15 @@ pub fn ldc(jenv: &mut JvmEnv, class: &Class) {
         }
         ConstPoolInfo::ConstantStringInfo { string_index } => {
             let s = class.constant_pool().get_utf8_string_at(*string_index);
-            let str_ref = jenv.new_java_string(s);
+            let str_ref = jenv.new_java_lang_string(s);
             let frame = jenv.thread.stack.frames.back_mut().unwrap();
             frame.operand_stack.push_object_ref(str_ref)
         }
         ConstPoolInfo::ConstantClassInfo { name_index } => {
             let name = class.constant_pool().get_utf8_string_at(*name_index);
-            let obj_ref = jenv.new_java_class(name);
+            let addr = jenv.new_java_lang_class(name);
             let frame = jenv.thread.stack.frames.back_mut().unwrap();
-            frame.operand_stack.push_object_ref(obj_ref);
+            frame.operand_stack.push_object_ref(addr);
         }
         ConstPoolInfo::ConstantMethodHandleInfo { .. } => unimplemented!(),
         ConstPoolInfo::ConstantMethodTypeInfo { .. } => unimplemented!(),
@@ -129,6 +129,17 @@ pub fn aaload(jenv: &mut JvmEnv, class: &Class) {
     let array = jenv.heap.get_object_array(&array_ref);
     debug!(index, ?array_ref, ?array, "aaload");
     frame.operand_stack.push(array[index as usize].clone());
+}
+
+pub fn caload(jenv: &mut JvmEnv, class: &Class) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let index = frame.operand_stack.pop_integer();
+    let array_ref = frame.operand_stack.pop();
+    let array = jenv.heap.get_char_array(&array_ref);
+    debug!(index, ?array_ref, ?array, "caload");
+    frame
+        .operand_stack
+        .push_integer(array[index as usize] as i32);
 }
 
 pub fn fload_n(jenv: &mut JvmEnv, class: &Class, n: i32) {
@@ -393,9 +404,9 @@ pub fn new(jenv: &mut JvmEnv, class: &Class) {
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = jenv.load_and_init_class(class_name);
-    let object_ref = jenv.heap.new_object(class);
+    let (object, addr) = jenv.heap.new_object(class);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
-    frame.operand_stack.push(Operand::ObjectRef(object_ref))
+    frame.operand_stack.push(Operand::ObjectRef(addr))
 }
 
 pub fn newarray(jenv: &mut JvmEnv, class: &Class) {
@@ -440,9 +451,9 @@ fn can_cast_to(jenv: &mut JvmEnv, s: Class, t: Class) -> bool {
             s.did_implement_interface(t)
         }
         (Class::InstanceClass(s), Class::InstanceClass(t)) if s.is_interface() && t.is_class() => {
-            t.name() == OBJECT_CLASS_NAME
+            t.name() == JAVA_LANG_OBJECT
         }
-        (s, Class::InstanceClass(t)) if t.is_class() => t.name() == OBJECT_CLASS_NAME,
+        (s, Class::InstanceClass(t)) if t.is_class() => t.name() == JAVA_LANG_OBJECT,
         (s, Class::InstanceClass(t)) if t.is_interface() => unimplemented!(),
         (Class::TypeArrayClass(s), Class::TypeArrayClass(t)) => s.ty == t.ty,
         (Class::ObjArrayClass(s), Class::ObjArrayClass(t)) => {

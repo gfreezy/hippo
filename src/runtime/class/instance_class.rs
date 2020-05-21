@@ -8,18 +8,17 @@ use crate::runtime::field::Field;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::method::Method;
 use nom::lib::std::collections::HashMap;
-use nom::lib::std::fmt::Formatter;
-use std::cell::Cell;
+use nom::lib::std::fmt::{Debug, Formatter};
+use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 use tracing::trace;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InstanceClass {
     inner: Arc<InnerClass>,
 }
 
-#[derive(Debug)]
 struct InnerClass {
     name: String,
     constant_pool: ConstPool,
@@ -30,7 +29,7 @@ struct InnerClass {
     instance_fields: HashMap<String, Field>,
     static_field_values: Mutex<Vec<Operand>>,
     methods: Vec<Method>,
-    object_class: Option<InstanceClass>,
+    mirror_class_name: RefCell<Option<String>>,
     inited: Cell<bool>,
 }
 
@@ -40,7 +39,6 @@ impl InstanceClass {
         class_file: ClassFile,
         super_class: Option<InstanceClass>,
         interfaces: Vec<InstanceClass>,
-        object_class: Option<InstanceClass>,
     ) -> Self {
         let ClassFile {
             constant_pool,
@@ -86,12 +84,16 @@ impl InstanceClass {
             static_field_values: Mutex::new(static_field_values),
             methods,
             interfaces,
-            object_class,
+            mirror_class_name: RefCell::new(None),
             inited: Cell::new(false),
         };
         InstanceClass {
             inner: Arc::new(inner_class),
         }
+    }
+
+    pub fn set_mirror_class_name(&self, name: String) {
+        self.inner.mirror_class_name.borrow_mut().replace(name);
     }
 
     pub fn set_inited(&self) {
@@ -202,6 +204,10 @@ impl InstanceClass {
 
     pub fn name(&self) -> &str {
         &self.inner.name
+    }
+
+    pub fn mirror_class_name(&self) -> String {
+        self.inner.mirror_class_name.borrow().clone().unwrap()
     }
 
     pub fn main_method(&self) -> Option<Method> {
@@ -394,5 +400,11 @@ fn get_default_value_from_field_info(
         })
     } else {
         None
+    }
+}
+
+impl Debug for InstanceClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "InstanceClass{{ name: {}}}", self.name())
     }
 }
