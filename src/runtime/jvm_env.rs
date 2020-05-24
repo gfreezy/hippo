@@ -3,30 +3,18 @@ use crate::runtime::class::Class;
 use crate::runtime::class_loader::ClassLoader;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
-use crate::runtime::frame::JvmFrame;
 use crate::runtime::heap::{
     JvmHeap, JAVA_LANG_CLASS, JAVA_LANG_STRING, JAVA_LANG_STRING_DESCRIPTOR, JAVA_LANG_THREAD,
     JAVA_LANG_THREAD_GROUP, JAVA_LANG_THREAD_GROUP_DESCRIPTOR,
 };
+use crate::runtime::jvm_thread::JvmThread;
 use crate::runtime::method::Method;
-use std::collections::VecDeque;
 use tracing::{debug, debug_span};
 
 const JAVA_STRING_FIELD_VALUE_INDEX: usize = 0;
 const JAVA_STRING_FIELD_HASH_INDEX: usize = 1;
 
 pub type JvmPC = usize;
-
-#[derive(Debug)]
-pub struct JvmStack {
-    pub frames: VecDeque<JvmFrame>,
-}
-
-#[derive(Debug)]
-pub struct JvmThread {
-    pub stack: JvmStack,
-    pub object_addr: u32,
-}
 
 #[derive(Debug)]
 pub struct JvmEnv {
@@ -39,12 +27,7 @@ impl JvmEnv {
     pub fn new(jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
         let mut jenv = JvmEnv {
             heap: JvmHeap::new(),
-            thread: JvmThread {
-                stack: JvmStack {
-                    frames: Default::default(),
-                },
-                object_addr: 0,
-            },
+            thread: JvmThread::new(),
             class_loader: ClassLoader::new(ClassPath::new(jre_opt, cp_opt)),
         };
         let thread_addr = jenv.new_java_lang_thread("main");
@@ -53,7 +36,9 @@ impl JvmEnv {
     }
 
     pub fn load_and_init_class(&mut self, class_name: &str) -> Class {
+        // let current_class = self.thread.current_class();
         let mut class = self.class_loader.load_class(class_name);
+
         if let Class::InstanceClass(class) = &mut class {
             if !class.is_inited() {
                 let span = debug_span!("init_class", %class_name);

@@ -7,6 +7,7 @@ mod frame;
 mod heap;
 mod instruction;
 mod jvm_env;
+mod jvm_thread;
 mod method;
 mod native;
 mod opcode;
@@ -83,7 +84,7 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
         return;
     }
 
-    let frame = JvmFrame::new_with_args(&method, args);
+    let frame = JvmFrame::new_with_args(class.clone(), method.clone(), args);
     jenv.thread.stack.frames.push_back(frame);
 
     while let Some(code) = jenv.thread.stack.frames.back_mut().unwrap().read_u8() {
@@ -501,7 +502,7 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
             "forName0",
             "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Class;",
         ) => {
-            // todo:
+            java_lang_Class_for_Name0(jenv, class, args);
         }
         (class_name, name, descriptor) => {
             panic!(

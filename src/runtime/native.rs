@@ -204,3 +204,17 @@ pub fn java_lang_Class_getName0(jenv: &mut JvmEnv, class: &Class, args: Vec<Oper
         .operand_stack
         .push(Operand::ObjectRef(addr));
 }
+
+pub fn java_lang_Class_for_Name0(jenv: &mut JvmEnv, class: &Class, args: Vec<Operand>) {
+    let name = jenv.get_java_string(&args[0]);
+    let class_name = name.replace('.', "/");
+    let class = jenv.load_and_init_class(&class_name);
+    // let addr = jenv.new_java_lang_string(name);
+    // jenv.thread
+    //     .stack
+    //     .frames
+    //     .back_mut()
+    //     .unwrap()
+    //     .operand_stack
+    //     .push(Operand::ObjectRef(addr));
+}
