@@ -1,6 +1,6 @@
 use crate::class_path::ClassPath;
 use crate::runtime::class::Class;
-use crate::runtime::class_loader::ClassLoader;
+use crate::runtime::class_loader::BootstrapClassLoader;
 use crate::runtime::execute_method;
 use crate::runtime::frame::operand_stack::Operand;
 use crate::runtime::heap::{
@@ -9,6 +9,8 @@ use crate::runtime::heap::{
 };
 use crate::runtime::jvm_thread::JvmThread;
 use crate::runtime::method::Method;
+use nom::lib::std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use tracing::{debug, debug_span};
 
 const JAVA_STRING_FIELD_VALUE_INDEX: usize = 0;
@@ -17,10 +19,32 @@ const JAVA_STRING_FIELD_HASH_INDEX: usize = 1;
 pub type JvmPC = usize;
 
 #[derive(Debug)]
+pub struct ClassId {
+    name: String,
+    classloader: Operand,
+}
+
+impl Hash for ClassId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(self.name.as_bytes())
+    }
+}
+
+impl PartialEq for ClassId {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for ClassId {}
+
+#[derive(Debug)]
 pub struct JvmEnv {
     pub heap: JvmHeap,
     pub thread: JvmThread,
-    pub class_loader: ClassLoader,
+    pub bootstrap_class_loader: BootstrapClassLoader,
+    pub defining_classes: HashMap<ClassId, Class>,
+    pub initiating_classes: HashMap<ClassId, Class>,
 }
 
 impl JvmEnv {
@@ -28,16 +52,72 @@ impl JvmEnv {
         let mut jenv = JvmEnv {
             heap: JvmHeap::new(),
             thread: JvmThread::new(),
-            class_loader: ClassLoader::new(ClassPath::new(jre_opt, cp_opt)),
+            bootstrap_class_loader: BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)),
+            defining_classes: Default::default(),
+            initiating_classes: Default::default(),
         };
         let thread_addr = jenv.new_java_lang_thread("main");
         jenv.thread.object_addr = thread_addr;
         jenv
     }
 
+    pub fn get_classloader(&self, class: &Class) -> Operand {
+        self.defining_classes
+            .keys()
+            .find_map(|k| {
+                if k.name == class.name() {
+                    Some(k.classloader.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(Operand::Null)
+    }
+
     pub fn load_and_init_class(&mut self, class_name: &str) -> Class {
-        // let current_class = self.thread.current_class();
-        let mut class = self.class_loader.load_class(class_name);
+        let current_class = self.thread.current_class();
+        let class_loader_addr = (current_class.as_ref())
+            .map(|c| self.get_classloader(c))
+            .unwrap_or(Operand::Null);
+        if let Some(class) = self.initiating_classes.get(&ClassId {
+            name: class_name.to_string(),
+            classloader: class_loader_addr.clone(),
+        }) {
+            return class.clone();
+        }
+
+        let mut class = if class_loader_addr == Operand::Null {
+            let class = self.bootstrap_class_loader.load_class(class_name);
+            self.defining_classes.insert(
+                ClassId {
+                    name: class_name.to_string(),
+                    classloader: class_loader_addr.clone(),
+                },
+                class.clone(),
+            );
+            class
+        } else {
+            let class_loader = self.heap.get_object(&class_loader_addr);
+            let load_class_method = class_loader
+                .get_method_by_name("loadClass", "(Ljava/lang/String;)Ljava/lang/Class;", false)
+                .unwrap();
+            let jclass_name = self.new_java_lang_string(class_name);
+            execute_method(
+                self,
+                load_class_method,
+                vec![Operand::ObjectRef(jclass_name)],
+            );
+            let _jclass_addr = self.thread.current_frame_mut().operand_stack.pop();
+            self.load_and_init_class(class_name)
+        };
+
+        self.initiating_classes.insert(
+            ClassId {
+                name: class_name.to_string(),
+                classloader: class_loader_addr,
+            },
+            class.clone(),
+        );
 
         if let Class::InstanceClass(class) = &mut class {
             if !class.is_inited() {

@@ -114,6 +114,12 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             opcode::ICONST_5 => {
                 iconst_n(jenv, &class, 5);
             }
+            opcode::LCONST_0 => {
+                lconst_n(jenv, &class, 0);
+            }
+            opcode::LCONST_1 => {
+                lconst_n(jenv, &class, 1);
+            }
             opcode::FCONST_0 => {
                 fconst_n(jenv, &class, 0.0);
             }

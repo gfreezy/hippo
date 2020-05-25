@@ -12,6 +12,11 @@ pub fn iconst_n(jenv: &mut JvmEnv, class: &Class, n: i32) {
     frame.operand_stack.push_integer(n);
 }
 
+pub fn lconst_n(jenv: &mut JvmEnv, class: &Class, n: i64) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    frame.operand_stack.push_long(n);
+}
+
 pub fn fconst_n(jenv: &mut JvmEnv, class: &Class, n: f32) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push_float(n);

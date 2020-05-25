@@ -1,5 +1,6 @@
 use crate::runtime::class::Class;
 use crate::runtime::frame::operand_stack::Operand;
+use crate::runtime::method::Method;
 use std::fmt;
 use std::fmt::Debug;
 
@@ -71,6 +72,10 @@ impl Object {
         self.class.name()
     }
 
+    pub fn mirror_class_name(&self) -> String {
+        self.class.mirror_class_name()
+    }
+
     pub fn set_field(&mut self, idx: usize, value: Operand) {
         self.fields[idx] = value;
     }
@@ -89,6 +94,15 @@ impl Object {
             .get_field(name, descriptor)
             .unwrap_or_else(|| panic!("{}:{}", name, descriptor));
         self.get_field(field.index())
+    }
+
+    pub fn get_method_by_name(
+        &self,
+        name: &str,
+        descriptor: &str,
+        is_static: bool,
+    ) -> Option<Method> {
+        self.class.get_method(name, descriptor, is_static)
     }
 
     pub fn get_field(&self, idx: usize) -> &Operand {

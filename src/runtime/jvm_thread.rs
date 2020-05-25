@@ -28,15 +28,15 @@ impl JvmThread {
         self.stack.frames.back_mut().unwrap()
     }
 
-    pub fn current_frame(&self) -> &JvmFrame {
-        self.stack.frames.back().unwrap()
+    pub fn current_frame(&self) -> Option<&JvmFrame> {
+        self.stack.frames.back()
     }
 
-    pub fn current_class(&self) -> Class {
-        self.current_frame().class.clone()
+    pub fn current_class(&self) -> Option<Class> {
+        Some(self.current_frame()?.class.clone())
     }
 
-    pub fn current_method(&self) -> Method {
-        self.current_frame().method.clone()
+    pub fn current_method(&self) -> Option<Method> {
+        Some(self.current_frame()?.method.clone())
     }
 }

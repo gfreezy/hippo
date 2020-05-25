@@ -5,17 +5,21 @@ use std::collections::HashMap;
 use tracing::debug;
 
 #[derive(Debug)]
-pub struct ClassLoader {
+pub struct BootstrapClassLoader {
     class_path: ClassPath,
     classes: HashMap<String, Class>,
 }
 
-impl ClassLoader {
+impl BootstrapClassLoader {
     pub fn new(class_path: ClassPath) -> Self {
-        ClassLoader {
+        BootstrapClassLoader {
             class_path,
             classes: Default::default(),
         }
+    }
+
+    pub fn contains_class(&self, class: &Class) -> bool {
+        self.classes.contains_key(class.name())
     }
 
     pub(super) fn load_class(&mut self, name: &str) -> Class {
