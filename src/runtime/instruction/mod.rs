@@ -96,6 +96,19 @@ pub fn iload_n(jenv: &mut JvmEnv, class: &Class, n: i32) {
     frame.operand_stack.push_integer(val);
 }
 
+pub fn lload_n(jenv: &mut JvmEnv, class: &Class, n: i32) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let val = frame.local_variable_array.get_long(n as u16);
+    frame.operand_stack.push_long(val);
+}
+
+pub fn lload(jenv: &mut JvmEnv, class: &Class) {
+    let frame = jenv.thread.stack.frames.back_mut().unwrap();
+    let index = frame.read_u8().unwrap();
+    let val = frame.local_variable_array.get_long(index as u16);
+    frame.operand_stack.push_long(val);
+}
+
 pub fn iload(jenv: &mut JvmEnv, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = frame.read_u8().unwrap();

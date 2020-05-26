@@ -208,6 +208,8 @@ pub fn java_lang_Class_getName0(jenv: &mut JvmEnv, class: &Class, args: Vec<Oper
 pub fn java_lang_Class_for_Name0(jenv: &mut JvmEnv, class: &Class, args: Vec<Operand>) {
     let name = jenv.get_java_string(&args[0]);
     let class_name = name.replace('.', "/");
+    eprintln!("class_for_Name0: {}", &class_name);
+    let _class = jenv.load_and_init_class(&class_name);
     let class_addr = jenv.new_java_lang_class(&class_name);
     jenv.thread
         .stack
@@ -216,4 +218,27 @@ pub fn java_lang_Class_for_Name0(jenv: &mut JvmEnv, class: &Class, args: Vec<Ope
         .unwrap()
         .operand_stack
         .push(Operand::ObjectRef(class_addr));
+}
+
+pub fn java_security_AccessController_getStackAccessControlContext(
+    jenv: &mut JvmEnv,
+    class: &Class,
+    args: Vec<Operand>,
+) {
+    jenv.thread
+        .stack
+        .frames
+        .back_mut()
+        .unwrap()
+        .operand_stack
+        .push(Operand::Null);
+}
+
+pub fn java_lang_Thread_setPriority0(jenv: &mut JvmEnv, class: &Class, args: Vec<Operand>) {
+    let priority = args[1].get_int();
+    if priority < 1 {
+        let object_ref = &args[0];
+        let object = jenv.heap.get_object_mut(&object_ref);
+        object.set_field_by_name("priority", "I", Operand::Int(5));
+    }
 }

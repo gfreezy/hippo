@@ -41,6 +41,13 @@ impl LocalVariableArray {
         }
     }
 
+    pub fn get_long(&mut self, index: u16) -> i64 {
+        match self.local_variables[index as usize] {
+            Operand::Long(num) => num,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn set_float(&mut self, index: u16, value: f32) {
         self.local_variables[index as usize] = Operand::Float(value);
     }

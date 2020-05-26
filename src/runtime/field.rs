@@ -64,16 +64,18 @@ impl Field {
     }
 
     pub fn default_value(&self) -> Operand {
-        match self.descriptor().as_str() {
-            "B" => Operand::Byte(0),
-            "C" => Operand::Char(0),
-            "D" => Operand::Double(0.0),
-            "F" => Operand::Float(0.0),
-            "I" => Operand::Int(0),
-            "J" => Operand::Long(0),
-            "S" => Operand::Short(0),
-            "Z" => Operand::Int(0),
-            _ => Operand::Null,
+        let descriptor = self.descriptor();
+        match descriptor.as_bytes()[0] {
+            b'B' => Operand::Byte(0),
+            b'C' => Operand::Char(0),
+            b'D' => Operand::Double(0.0),
+            b'F' => Operand::Float(0.0),
+            b'I' => Operand::Int(0),
+            b'J' => Operand::Long(0),
+            b'S' => Operand::Short(0),
+            b'Z' => Operand::Int(0),
+            b'L' | b'[' => Operand::Null,
+            _ => unreachable!("{}", descriptor),
         }
     }
 }

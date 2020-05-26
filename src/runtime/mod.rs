@@ -31,8 +31,8 @@ pub struct Jvm {
 
 impl Drop for Jvm {
     fn drop(&mut self) {
-        eprintln!("heap: {:?}", self.jenv.heap);
-        eprintln!("backtraces:");
+        eprintln!("\nheap: {:?}\n", self.jenv.heap);
+        eprintln!("backtraces:\n");
         for frame in &self.jenv.thread.stack.frames {
             eprintln!(
                 "{}.{}:{}, pc={}",
@@ -42,7 +42,7 @@ impl Drop for Jvm {
                 frame.pc() - 1
             );
             eprintln!(
-                "locals: {:?}\noperand_stack:{:?}",
+                "\tlocals: {:?}\n\toperand_stack:{:?}",
                 frame.local_variable_array, frame.operand_stack,
             );
         }
@@ -179,6 +179,21 @@ fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
             }
             opcode::ILOAD_3 => {
                 iload_n(jenv, &class, 3);
+            }
+            opcode::LLOAD_0 => {
+                lload_n(jenv, &class, 0);
+            }
+            opcode::LLOAD_1 => {
+                lload_n(jenv, &class, 1);
+            }
+            opcode::LLOAD_2 => {
+                lload_n(jenv, &class, 2);
+            }
+            opcode::LLOAD_3 => {
+                lload_n(jenv, &class, 3);
+            }
+            opcode::LLOAD => {
+                lload(jenv, &class);
             }
             opcode::ALOAD_0 => {
                 aload_n(jenv, &class, 0);
@@ -509,6 +524,16 @@ fn execute_native_method(jenv: &mut JvmEnv, class: &Class, method: Method, args:
             "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Class;",
         ) => {
             java_lang_Class_for_Name0(jenv, class, args);
+        }
+        (
+            "java/security/AccessController",
+            "getStackAccessControlContext",
+            "()Ljava/security/AccessControlContext;",
+        ) => {
+            java_security_AccessController_getStackAccessControlContext(jenv, class, args);
+        }
+        ("java/lang/Thread", "setPriority0", "(I)V") => {
+            java_lang_Thread_setPriority0(jenv, class, args)
         }
         (class_name, name, descriptor) => {
             panic!(

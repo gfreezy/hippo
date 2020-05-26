@@ -94,28 +94,28 @@ impl OperandStack {
     pub fn pop_integer(&mut self) -> i32 {
         match self.stack.pop() {
             Some(Operand::Int(num)) => num,
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 
     pub fn pop_double(&mut self) -> f64 {
         match self.stack.pop() {
             Some(Operand::Double(num)) => num,
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 
     pub fn pop_long(&mut self) -> i64 {
         match self.stack.pop() {
             Some(Operand::Long(num)) => num,
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 
     pub fn pop_float(&mut self) -> f32 {
         match self.stack.pop() {
             Some(Operand::Float(num)) => num,
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 
@@ -123,7 +123,7 @@ impl OperandStack {
         match self.stack.pop() {
             Some(Operand::ObjectRef(num)) => num,
             Some(Operand::ArrayRef(num)) => num,
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 

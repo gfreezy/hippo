@@ -59,9 +59,11 @@ impl InstanceClass {
         for filed_info in &field_infos {
             if filed_info.is_static() {
                 let f = Field::new(&constant_pool, filed_info, static_index);
-                static_fields.insert(f.name(), f);
+                static_fields.insert(f.name(), f.clone());
+                // todo: default with type
                 let v = get_default_value_from_field_info(filed_info, &constant_pool)
-                    .unwrap_or(Operand::Null);
+                    .unwrap_or(f.default_value());
+
                 static_field_values.push(v);
                 static_index += 1;
             } else {
