@@ -10,6 +10,7 @@ mod jvm_env;
 mod jvm_thread;
 mod method;
 mod native;
+mod object_reference;
 mod opcode;
 
 use crate::runtime::class::{Class, InstanceClass};
@@ -48,6 +49,7 @@ impl Drop for Jvm {
         }
     }
 }
+
 impl Jvm {
     pub fn new(class_name: &str, jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
         let mut jvm = Jvm {
