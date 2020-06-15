@@ -3,12 +3,13 @@ pub mod constant_pool;
 pub mod descriptor;
 pub mod field_info;
 pub mod method_info;
+mod nom_utils;
 
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPool, ConstPoolInfo};
 use crate::class_parser::field_info::{parse_field_info, FieldInfo};
 use crate::class_parser::method_info::{parse_method_info, MethodInfo};
-use crate::nom_utils::length_many;
+use crate::class_parser::nom_utils::length_many;
 use anyhow::{ensure, Result};
 use nom::bytes::complete::tag;
 use nom::eof;

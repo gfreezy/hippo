@@ -1,3 +1,5 @@
+use crate::class::class::cp_cache::CpCache;
+use crate::class::class::Class;
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::descriptor::method_descriptor;
 use crate::class_parser::method_info::MethodInfo;
@@ -5,9 +7,8 @@ use crate::class_parser::{
     is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
     ACC_STATIC, ACC_VARARGS,
 };
-use crate::runtime::class::Class;
-use crate::runtime::cp_cache::CpCache;
-use crate::runtime::jvm_env::JvmPC;
+use crate::gc::oop::InstanceOop;
+use crate::operand::JvmPC;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -36,10 +37,16 @@ struct InnerMethod {
     param_descriptors: Vec<String>,
     return_descriptor: String,
     cp_cache: Mutex<CpCache>,
+    loader: InstanceOop,
 }
 
 impl Method {
-    pub fn new(const_pool: &ConstPool, method_info: MethodInfo, class_name: String) -> Self {
+    pub fn new(
+        const_pool: &ConstPool,
+        method_info: MethodInfo,
+        class_name: String,
+        loader: InstanceOop,
+    ) -> Self {
         let name = const_pool.get_utf8_string_at(method_info.name_index);
         let descriptor = const_pool.get_utf8_string_at(method_info.descriptor_index);
         let (_, (params, return_descriptor)) =
@@ -73,6 +80,7 @@ impl Method {
                     param_descriptors: params,
                     return_descriptor,
                     cp_cache: Mutex::new(CpCache::new(0)),
+                    loader,
                 }),
             }
         } else {
@@ -94,6 +102,7 @@ impl Method {
                     class_name,
                     param_descriptors: params,
                     return_descriptor,
+                    loader,
                 }),
             }
         }

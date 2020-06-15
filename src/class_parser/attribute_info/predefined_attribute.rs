@@ -17,7 +17,7 @@ use self::VerificationTypeInfo::{
 };
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::ConstPool;
-use crate::nom_utils::length_many;
+use crate::class_parser::nom_utils::length_many;
 use nom::multi::{length_data, many_m_n};
 use nom::number::complete::{be_u16, be_u32, be_u8};
 use nom::IResult;
