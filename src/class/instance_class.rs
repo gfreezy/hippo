@@ -1,25 +1,18 @@
-use crate::class::class::Class;
+use crate::class::ClassType;
+use crate::class::{Class, InnerClass};
+use crate::class_parser::ClassFile;
+use crate::gc::global_definition::JObject;
+use crate::gc::oop::Oop;
+use std::sync::Arc;
 
 #[repr(C)]
 pub struct InstanceClass {
-    class: Class,
+    class: InnerClass,
 }
 
 macro_rules! impl_instance_class {
     ($ty: tt) => {
         impl $ty {
-            pub fn set_id(&self, id: crate::gc::oop_desc::ClassId) {
-                self.class.set_id(id)
-            }
-
-            pub fn instance_size(&self) -> usize {
-                self.class.instance_size()
-            }
-
-            pub fn id(&self) -> crate::gc::oop_desc::ClassId {
-                self.class.id()
-            }
-
             pub fn is_interface(&self) -> bool {
                 self.class.is_interface()
             }
@@ -33,25 +26,35 @@ macro_rules! impl_instance_class {
             }
 
             pub fn is_super(&self) -> bool {
-                self.is_super()
+                self.class.is_super()
             }
 
             pub fn is_public(&self) -> bool {
-                self.is_public()
+                self.class.is_public()
             }
 
             pub fn is_private(&self) -> bool {
-                self.is_private()
+                self.class.is_private()
             }
 
             pub fn is_protected(&self) -> bool {
-                self.is_protected()
+                self.class.is_protected()
             }
+
             pub fn is_final(&self) -> bool {
-                self.is_final()
+                self.class.is_final()
             }
-            pub fn set_mirror_class(&self, oop: crate::gc::oop::InstanceOop) {
-                self.class.set_mirror_class(oop)
+
+            pub fn class_loader(&self) -> crate::gc::global_definition::JObject {
+                self.class.class_loader()
+            }
+
+            pub fn set_instance_size(&self, size: usize) {
+                self.class.set_instance_size(size)
+            }
+
+            pub fn static_size(&self) -> usize {
+                self.class.static_size()
             }
 
             pub fn constant_pool(&self) -> &crate::class_parser::constant_pool::ConstPool {
@@ -62,10 +65,8 @@ macro_rules! impl_instance_class {
                 self.class.access_flags()
             }
 
-            pub fn super_class(&self) -> Option<$ty> {
-                Some($ty {
-                    class: self.class.super_class()?,
-                })
+            pub fn super_class(&self) -> Option<$crate::class::Class> {
+                self.class.super_class()
             }
 
             pub fn instance_fields(
@@ -153,19 +154,44 @@ macro_rules! impl_instance_class {
                 self.class.is_subclass_of(class)
             }
         }
-
-        impl From<$ty> for crate::class::Class {
-            fn from(c: $ty) -> Self {
-                c.class
-            }
-        }
     };
 }
 
 impl_instance_class!(InstanceClass);
 
-impl From<Class> for InstanceClass {
-    fn from(c: Class) -> Self {
-        InstanceClass { class: c }
+impl InstanceClass {
+    pub fn new(
+        name: String,
+        class_file: ClassFile,
+        super_class: Option<Class>,
+        interfaces: Vec<Class>,
+        mirror_class: JObject,
+        loader: JObject,
+    ) -> Self {
+        InstanceClass {
+            class: InnerClass::new(
+                name,
+                class_file,
+                super_class,
+                interfaces,
+                mirror_class,
+                loader,
+            ),
+        }
+    }
+    pub fn instance_size(&self) -> usize {
+        self.class.instance_size()
+    }
+}
+
+impl From<InstanceClass> for Class {
+    fn from(cls: InstanceClass) -> Class {
+        Class::InstanceClass(Arc::new(cls))
+    }
+}
+
+impl PartialEq for InstanceClass {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name()
     }
 }

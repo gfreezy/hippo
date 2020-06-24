@@ -1,5 +1,5 @@
-use crate::class::class::cp_cache::CpCache;
-use crate::class::class::Class;
+use crate::class::inner_class::cp_cache::CpCache;
+use crate::class::Class;
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::descriptor::method_descriptor;
 use crate::class_parser::method_info::MethodInfo;
@@ -7,8 +7,8 @@ use crate::class_parser::{
     is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
     ACC_STATIC, ACC_VARARGS,
 };
-use crate::gc::oop::InstanceOop;
-use crate::operand::JvmPC;
+use crate::gc::global_definition::JObject;
+use crate::gc::oop::{InstanceOop, Oop};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -37,7 +37,7 @@ struct InnerMethod {
     param_descriptors: Vec<String>,
     return_descriptor: String,
     cp_cache: Mutex<CpCache>,
-    loader: InstanceOop,
+    loader: JObject,
 }
 
 impl Method {
@@ -45,7 +45,7 @@ impl Method {
         const_pool: &ConstPool,
         method_info: MethodInfo,
         class_name: String,
-        loader: InstanceOop,
+        loader: JObject,
     ) -> Self {
         let name = const_pool.get_utf8_string_at(method_info.name_index);
         let descriptor = const_pool.get_utf8_string_at(method_info.descriptor_index);
@@ -108,15 +108,19 @@ impl Method {
         }
     }
 
-    pub fn resolve_static_field(&self, pc: JvmPC) -> Option<(Class, usize)> {
+    pub fn class_loader(&self) -> JObject {
+        self.inner.loader
+    }
+
+    pub fn resolve_static_field(&self, pc: usize) -> Option<(Class, usize)> {
         self.inner.cp_cache.lock().unwrap().resolve_static_field(pc)
     }
 
-    pub fn resolve_field(&self, pc: JvmPC) -> Option<usize> {
+    pub fn resolve_field(&self, pc: usize) -> Option<usize> {
         self.inner.cp_cache.lock().unwrap().resolve_field(pc)
     }
 
-    pub fn set_field(&self, pc: JvmPC, field_index: usize) {
+    pub fn set_field(&self, pc: usize, field_index: usize) {
         self.inner
             .cp_cache
             .lock()
@@ -124,7 +128,7 @@ impl Method {
             .set_field(pc, field_index)
     }
 
-    pub fn set_static_field(&self, pc: JvmPC, class: Class, field_index: usize) {
+    pub fn set_static_field(&self, pc: usize, class: Class, field_index: usize) {
         self.inner
             .cp_cache
             .lock()

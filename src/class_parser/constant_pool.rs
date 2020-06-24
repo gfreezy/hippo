@@ -181,11 +181,12 @@ impl ConstPool {
         }
     }
 
-    pub fn get_constant_string_at(&self, index: u16) -> u16 {
-        match self.get_const_pool_info_at(index) {
+    pub fn get_constant_string_at(&self, index: u16) -> &String {
+        let index = match self.get_const_pool_info_at(index) {
             ConstPoolInfo::ConstantStringInfo { string_index } => *string_index,
             _ => unreachable!(),
-        }
+        };
+        self.get_utf8_string_at(index)
     }
 }
 

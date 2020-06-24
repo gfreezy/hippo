@@ -1,59 +1,45 @@
-pub mod cp_cache;
-pub mod field;
-pub mod method;
-
-use crate::class::class::field::descriptor_size_in_bytes;
-use crate::class::class::method::Method;
-use crate::class::InstanceMirrorClass;
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
     ClassFile, ACC_FINAL, ACC_INTERFACE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC, ACC_STATIC,
     ACC_SUPER,
 };
-use crate::gc::mem::align_usize;
-use crate::gc::oop::InstanceOop;
-use crate::gc::oop_desc::ClassId;
-use crate::operand::Operand;
-use field::Field;
+use crate::runtime::field::Field;
+use crate::runtime::frame::operand_stack::Operand;
+use crate::runtime::method::Method;
 use nom::lib::std::collections::HashMap;
 use nom::lib::std::fmt::{Debug, Formatter};
-use parking_lot::{Mutex, RwLock};
 use std::cell::{Cell, RefCell};
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::trace;
 
 #[derive(Clone)]
-pub struct Class {
+pub struct InstanceClass {
     inner: Arc<InnerClass>,
 }
 
-#[repr(C)]
 struct InnerClass {
-    id: Mutex<ClassId>,
     name: String,
     layout_helper: usize,
     constant_pool: ConstPool,
     access_flags: u16,
-    super_class: Option<Class>,
-    interfaces: Vec<Class>,
+    super_class: Option<InstanceClass>,
+    interfaces: Vec<InstanceClass>,
     static_fields: HashMap<String, Field>,
     instance_fields: HashMap<String, Field>,
+    static_field_values: Mutex<Vec<Operand>>,
     methods: Vec<Method>,
-    mirror_class: RwLock<InstanceOop>,
-    instance_size: usize,
-    static_size: usize,
-    loader: InstanceOop,
+    mirror_class_name: RefCell<Option<String>>,
+    inited: Cell<bool>,
 }
 
-impl Class {
+impl InstanceClass {
     pub fn new(
         name: String,
         class_file: ClassFile,
-        super_class: Option<Class>,
-        interfaces: Vec<Class>,
-        loader: InstanceOop,
+        super_class: Option<InstanceClass>,
+        interfaces: Vec<InstanceClass>,
     ) -> Self {
         let ClassFile {
             constant_pool,
@@ -62,61 +48,36 @@ impl Class {
             methods: method_infos,
             ..
         } = class_file;
-        let mut fields = field_infos
-            .into_iter()
-            .map(|field_info| {
-                let name = constant_pool
-                    .get_utf8_string_at(field_info.name_index)
-                    .to_string();
-                let descriptor = constant_pool
-                    .get_utf8_string_at(field_info.descriptor_index)
-                    .to_string();
-                let field_size = descriptor_size_in_bytes(&descriptor);
-                (name, descriptor, field_size, field_info)
-            })
-            .collect::<Vec<_>>();
-        fields.sort_by_key(|f| f.2);
-        let mut instance_offset = super_class.clone().map(|c| c.instance_size()).unwrap_or(0);
-        let mut static_offset = 0;
-        let mut instance_fields = HashMap::new();
+        let base_index = super_class
+            .as_ref()
+            .map(|c| c.total_instance_fields())
+            .unwrap_or(0);
+        let mut instance_index = base_index;
+        let mut static_index = 0;
         let mut static_fields = HashMap::new();
-        for (name, descriptor, size, field_info) in fields {
-            if field_info.is_static() {
-                static_offset = align_usize(static_offset, size);
-                let mut f = Field::new(
-                    name,
-                    descriptor,
-                    field_info.access_flags,
-                    size,
-                    static_offset,
-                    loader,
-                );
+        let mut instance_fields = HashMap::new();
+        let mut static_field_values = Vec::new();
+        for filed_info in &field_infos {
+            if filed_info.is_static() {
+                let f = Field::new(&constant_pool, filed_info, static_index);
                 static_fields.insert(f.name(), f.clone());
-                static_offset += f.size();
+                // todo: default with type
+                let v = get_default_value_from_field_info(filed_info, &constant_pool)
+                    .unwrap_or(f.default_value());
+
+                static_field_values.push(v);
+                static_index += 1;
             } else {
-                instance_offset = align_usize(instance_offset, size);
-                let mut f = Field::new(
-                    name,
-                    descriptor,
-                    field_info.access_flags,
-                    size,
-                    instance_offset,
-                    loader,
-                );
-                instance_fields.insert(f.name(), f.clone());
-                instance_offset += f.size();
+                let f = Field::new(&constant_pool, filed_info, instance_index);
+                instance_fields.insert(f.name(), f);
+                instance_index += 1;
             }
         }
-
         let methods = method_infos
             .into_iter()
-            .map(|method| Method::new(&constant_pool, method, name.clone(), loader))
+            .map(|method| Method::new(&constant_pool, method, name.clone()))
             .collect();
-
-        let loader_class = loader.0.class;
-
         let inner_class = InnerClass {
-            id: Mutex::new(0),
             name,
             layout_helper: 0,
             constant_pool,
@@ -124,32 +85,27 @@ impl Class {
             super_class,
             instance_fields,
             static_fields,
+            static_field_values: Mutex::new(static_field_values),
             methods,
             interfaces,
-            mirror_class: RwLock::new(unsafe { InstanceOop::empty() }),
-            instance_size: instance_offset,
-            static_size: static_offset,
-            loader,
+            mirror_class_name: RefCell::new(None),
+            inited: Cell::new(false),
         };
-        Class {
+        InstanceClass {
             inner: Arc::new(inner_class),
         }
     }
 
-    pub fn set_mirror_class(&self, oop: InstanceOop) {
-        *self.inner.mirror_class.write() = oop;
+    pub fn set_mirror_class_name(&self, name: String) {
+        self.inner.mirror_class_name.borrow_mut().replace(name);
     }
 
-    pub fn set_id(&self, id: ClassId) {
-        *self.inner.id.lock() = id;
+    pub fn set_inited(&self) {
+        self.inner.inited.replace(true);
     }
 
-    pub fn id(&self) -> ClassId {
-        *self.inner.id.lock()
-    }
-
-    pub fn instance_size(&self) -> usize {
-        self.inner.instance_size
+    pub fn is_inited(&self) -> bool {
+        self.inner.inited.get()
     }
 
     pub fn is_interface(&self) -> bool {
@@ -191,36 +147,35 @@ impl Class {
         self.inner.access_flags
     }
 
-    pub fn super_class(&self) -> Option<Class> {
+    pub fn super_class(&self) -> Option<InstanceClass> {
         self.inner.super_class.clone()
+    }
+
+    pub fn iter_super_classes(&self) -> SuperClassesIter {
+        SuperClassesIter(self.clone())
     }
 
     pub fn instance_fields(&self) -> &HashMap<String, Field> {
         &self.inner.instance_fields
     }
 
+    fn all_instance_fields_unordered(&self) -> Vec<Field> {
+        let mut fields: Vec<_> = self.instance_fields().values().cloned().collect();
+        if let Some(class) = self.super_class() {
+            for f in class.all_instance_fields_unordered() {
+                fields.push(f);
+            }
+        }
+        fields
+    }
+
+    pub fn all_instance_fields(&self) -> Vec<Field> {
+        let mut fs = self.all_instance_fields_unordered();
+        fs.sort_by_key(|f| f.index());
+        fs
+    }
     pub fn static_fields(&self) -> &HashMap<String, Field> {
         &self.inner.static_fields
-    }
-
-    pub fn total_self_instance_fields(&self) -> usize {
-        self.inner.instance_fields.len()
-    }
-
-    pub fn methods(&self) -> &[Method] {
-        &self.inner.methods
-    }
-
-    pub fn interfaces(&self) -> &[Class] {
-        &self.inner.interfaces
-    }
-
-    pub fn name(&self) -> &str {
-        &self.inner.name
-    }
-
-    pub fn iter_super_classes(&self) -> SuperClassesIter {
-        SuperClassesIter(self.clone())
     }
 
     pub fn total_instance_fields(&self) -> usize {
@@ -231,12 +186,36 @@ impl Class {
                 .unwrap_or(0)
     }
 
-    pub fn did_implement_interface(&self, interface: Class) -> bool {
+    pub fn total_self_instance_fields(&self) -> usize {
+        self.inner.instance_fields.len()
+    }
+
+    pub fn methods(&self) -> &[Method] {
+        &self.inner.methods
+    }
+
+    pub fn interfaces(&self) -> &[InstanceClass] {
+        &self.inner.interfaces
+    }
+
+    pub fn did_implement_interface(&self, interface: InstanceClass) -> bool {
         self.inner.interfaces.contains(&interface)
             || self
                 .super_class()
                 .map(|c| c.did_implement_interface(interface))
                 .unwrap_or(false)
+    }
+
+    pub fn name(&self) -> &str {
+        &self.inner.name
+    }
+
+    pub fn mirror_class_name(&self) -> String {
+        self.inner.mirror_class_name.borrow().clone().unwrap()
+    }
+
+    pub fn main_method(&self) -> Option<Method> {
+        self.get_self_method("main", "([Ljava/lang/String;)V", true)
     }
 
     pub fn clinit_method(&self) -> Option<Method> {
@@ -333,6 +312,14 @@ impl Class {
             .cloned()
     }
 
+    pub fn get_static_field_value(&self, index: usize) -> Operand {
+        self.inner.static_field_values.lock().unwrap()[index].clone()
+    }
+
+    pub fn set_static_field_value(&self, index: usize, value: Operand) {
+        self.inner.static_field_values.lock().unwrap()[index] = value;
+    }
+
     pub fn get_field(&self, name: &str, descriptor: &str) -> Option<Field> {
         if let Some(field) = self.get_self_field(name, descriptor) {
             return Some(field);
@@ -355,7 +342,7 @@ impl Class {
         None
     }
 
-    pub fn is_subclass_of(&self, class: Class) -> bool {
+    pub fn is_subclass_of(&self, class: InstanceClass) -> bool {
         let mut current = self.clone();
         while let Some(klass) = current.super_class() {
             if klass == class {
@@ -367,22 +354,22 @@ impl Class {
     }
 }
 
-impl fmt::Display for Class {
+impl fmt::Display for InstanceClass {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
-impl PartialEq for Class {
+impl PartialEq for InstanceClass {
     fn eq(&self, other: &Self) -> bool {
         self.name() == other.name()
     }
 }
 
-pub struct SuperClassesIter(Class);
+pub struct SuperClassesIter(InstanceClass);
 
 impl Iterator for SuperClassesIter {
-    type Item = Class;
+    type Item = InstanceClass;
 
     fn next(&mut self) -> Option<Self::Item> {
         let super_class = self.0.super_class();
@@ -420,8 +407,8 @@ fn get_default_value_from_field_info(
     }
 }
 
-impl Debug for Class {
+impl Debug for InstanceClass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Class{{ name: {}}}", self.name())
+        write!(f, "InstanceClass{{ name: {}}}", self.name())
     }
 }

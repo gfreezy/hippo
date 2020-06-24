@@ -1,10 +1,13 @@
-use crate::class::{alloc_object, Class, InstanceMirrorClass};
+use crate::class::{alloc_jobject, Class, ClassId, InstanceMirrorClass};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 use crate::class_loader::class_path::ClassPath;
-use crate::gc::oop::InstanceOop;
-use crate::gc::oop_desc::ClassId;
+use crate::gc::global_definition::JObject;
+use crate::gc::oop::{InstanceOop, Oop};
+use crate::jenv::JTHREAD;
+use crate::jvm::execute_method;
 use nom::lib::std::collections::HashMap;
-use parking_lot::RwLock;
+use once_cell::sync::OnceCell;
+use parking_lot::{Mutex, RwLock};
 use std::collections::hash_map::Entry;
 
 struct GlobalClasses {
@@ -13,6 +16,8 @@ struct GlobalClasses {
 
 struct Inner {
     classes: Vec<Class>,
+    defining_classes: Vec<ClassId>,
+    initiating_classes: Vec<ClassId>,
     map: HashMap<String, ClassId>,
 }
 
@@ -21,6 +26,8 @@ impl GlobalClasses {
         let inner = Inner {
             classes: Vec::new(),
             map: HashMap::new(),
+            defining_classes: Vec::new(),
+            initiating_classes: Vec::new(),
         };
         GlobalClasses {
             inner: RwLock::new(inner),
@@ -31,6 +38,7 @@ impl GlobalClasses {
 lazy_static::lazy_static! {
     static ref GLOBAL_CLASSES: GlobalClasses = GlobalClasses::new();
 }
+pub static BOOTSTRAP_LOADER: OnceCell<Mutex<BootstrapClassLoader>> = OnceCell::new();
 
 pub fn get_class_by_id(id: ClassId) -> Class {
     let g = GLOBAL_CLASSES.inner.read();
@@ -40,19 +48,24 @@ pub fn get_class_by_id(id: ClassId) -> Class {
         .clone()
 }
 
-pub fn get_class_by_name(name: &str) -> Class {
+pub fn get_class_id_by_name(name: &str) -> ClassId {
     let g = GLOBAL_CLASSES.inner.read();
-    let id = g
-        .map
-        .get(name)
-        .unwrap_or_else(|| panic!("get class by name: {}", name));
-    g.classes
-        .get(*id)
-        .unwrap_or_else(|| panic!("get class by id: {}", id))
-        .clone()
+    *g.map.get(name).unwrap()
 }
 
-pub fn register_class(class: Class, loader: InstanceOop) -> ClassId {
+fn get_class_by_name(name: &str) -> Option<Class> {
+    let g = GLOBAL_CLASSES.inner.read();
+    let id = g.map.get(name)?;
+    Some(g.classes.get(*id)?.clone())
+}
+
+fn register_class(class: Class, loader: JObject) -> ClassId {
+    let clinit_method = class.clinit_method();
+    if let Some(clinit_method) = clinit_method {
+        JTHREAD.with(|thread| {
+            execute_method(&mut thread.borrow_mut(), clinit_method, vec![]);
+        });
+    }
     let mut g = GLOBAL_CLASSES.inner.write();
     let Inner { classes, map, .. } = &mut *g;
     let entry = map.entry(class.name().to_string());
@@ -60,21 +73,28 @@ pub fn register_class(class: Class, loader: InstanceOop) -> ClassId {
         return *occupied.get();
     }
     let class_id = classes.len();
-    class.set_id(class_id);
-    let mirror_class = InstanceMirrorClass::new(loader);
-    let mirror_class_oop = alloc_object(mirror_class.into());
-    class.set_mirror_class(mirror_class_oop.into());
     classes.push(class);
     entry.or_insert(class_id);
     class_id
 }
 
-pub fn load_class(loader: InstanceOop, name: &str) -> Class {
-    if loader.is_empty() {
-        unimplemented!()
+pub fn load_class(loader: JObject, name: &str) -> Class {
+    if let Some(class) = get_class_by_name(name) {
+        assert_eq!(class.class_loader(), loader);
+        return class;
+    }
+
+    if loader.is_null() {
+        let mut boot_loader = BOOTSTRAP_LOADER
+            .get()
+            .expect("get bootstarap_loader")
+            .lock();
+        let class = boot_loader.load_class(name);
+        let _class_id = register_class(class.clone(), loader.clone());
+        return class;
     }
     unimplemented!()
 }
 
-mod bootstrap_class_loader;
-mod class_path;
+pub mod bootstrap_class_loader;
+pub mod class_path;

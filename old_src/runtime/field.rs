@@ -1,60 +1,57 @@
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{ACC_FINAL, ACC_STATIC};
-use crate::gc::oop::InstanceOop;
-use crate::operand::Operand;
+use crate::runtime::frame::operand_stack::Operand;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Field {
+    inner: Arc<InnerField>,
+}
+
+#[derive(Debug)]
+struct InnerField {
     access_flags: u16,
     name: String,
     descriptor: String,
-    offset: usize,
-    size: usize,
-    loader: InstanceOop,
+    index: usize,
 }
 
 impl Field {
-    pub fn new(
-        name: String,
-        descriptor: String,
-        access_flags: u16,
-        size: usize,
-        offset: usize,
-        loader: InstanceOop,
-    ) -> Field {
+    pub fn new(const_pool: &ConstPool, field: &FieldInfo, index: usize) -> Field {
+        let name = const_pool.get_utf8_string_at(field.name_index).to_string();
+        let descriptor = const_pool
+            .get_utf8_string_at(field.descriptor_index)
+            .to_string();
+
         Field {
-            access_flags,
-            name,
-            descriptor,
-            offset,
-            size,
-            loader,
+            inner: Arc::new(InnerField {
+                access_flags: field.access_flags,
+                name,
+                descriptor,
+                index,
+            }),
         }
     }
 
+    pub fn layout_helper(&self) -> usize {
+        unimplemented!()
+    }
+
     pub fn access_flags(&self) -> u16 {
-        self.access_flags
+        self.inner.access_flags
     }
 
     pub fn descriptor(&self) -> String {
-        self.descriptor.clone()
+        self.inner.descriptor.clone()
     }
 
     pub fn name(&self) -> String {
-        self.name.clone()
+        self.inner.name.clone()
     }
 
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn set_offset(&mut self, offset: usize) {
-        self.offset = offset
+    pub fn index(&self) -> usize {
+        self.inner.index
     }
 
     pub fn is_long_or_double(&self) -> bool {
@@ -84,20 +81,5 @@ impl Field {
             b'L' | b'[' => Operand::Null,
             _ => unreachable!("{}", descriptor),
         }
-    }
-}
-
-pub fn descriptor_size_in_bytes(descriptor: &str) -> usize {
-    match descriptor.as_bytes()[0] {
-        b'B' => 1,
-        b'C' => 2,
-        b'D' => 8,
-        b'F' => 4,
-        b'I' => 4,
-        b'J' => 8,
-        b'S' => 2,
-        b'Z' => 4,
-        b'L' | b'[' => 8,
-        _ => unreachable!("{}", descriptor),
     }
 }
