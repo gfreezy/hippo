@@ -6,7 +6,7 @@ use crate::gc::global_definition::{JObject, JValue};
 use crate::jenv::{get_java_string, new_java_lang_string};
 use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
-use std::thread::Thread;
+
 
 pub fn java_lang_Class_getPrimitiveClass(
     thread: &mut JvmThread,

@@ -1,4 +1,4 @@
-use crate::gc::global_definition::BITS_PER_WORD;
+
 
 // Constants
 pub const AGE_BITS: usize = 4;

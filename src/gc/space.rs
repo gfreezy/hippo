@@ -6,7 +6,7 @@ use crate::gc::os::ProtType;
 use parking_lot::Mutex;
 use std::collections::LinkedList;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
+
 
 pub struct Space {
     start: Address,

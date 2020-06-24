@@ -1,8 +1,8 @@
-use crate::class::ClassType;
+
 use crate::class::{Class, InnerClass};
 use crate::class_parser::ClassFile;
 use crate::gc::global_definition::JObject;
-use crate::gc::oop::Oop;
+
 use std::sync::Arc;
 
 #[repr(C)]

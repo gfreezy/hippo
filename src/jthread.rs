@@ -1,6 +1,6 @@
 use crate::class::{Class, Method};
 use crate::frame::JvmFrame;
-use crate::gc::global_definition::{JInt, JObject};
+use crate::gc::global_definition::{JObject};
 use std::collections::VecDeque;
 
 #[derive(Debug)]

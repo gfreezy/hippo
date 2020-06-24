@@ -1,4 +1,4 @@
-use crate::class::{Class, ClassId, InnerClass};
+use crate::class::{Class, InnerClass};
 use crate::gc::global_definition::BasicType;
 
 pub struct TypeArrayClass {

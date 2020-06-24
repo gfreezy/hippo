@@ -1,12 +1,12 @@
 pub(crate) mod type_to_basic_type;
 
 use crate::class::ClassId;
-use crate::gc::address::Address;
+
 use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
 use crate::gc::mark_word::MarkWord;
 use crate::gc::oop::{ArrayOop, InstanceOop, Oop};
-use std::convert::TryFrom;
-use std::marker::PhantomData;
+
+
 use std::mem::size_of;
 
 pub const HEAP_WORD_SIZE: usize = size_of::<usize>();
@@ -210,14 +210,14 @@ impl JArray {
         self.0.len()
     }
 
-    pub fn get<T>(&self, i: usize) -> T
+    pub fn get<T>(&self, _i: usize) -> T
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
         unimplemented!()
     }
 
-    pub fn set<T>(&self, i: usize, v: T)
+    pub fn set<T>(&self, _i: usize, _v: T)
     where
         TypeToBasicType<T>: Into<BasicType>,
     {

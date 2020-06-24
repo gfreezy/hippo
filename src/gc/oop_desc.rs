@@ -9,7 +9,7 @@ use crate::gc::global_definition::{
 use crate::gc::mark_word::MarkWord;
 use crate::gc::mem::align_usize;
 use field_offset::__memoffset::mem::transmute;
-use field_offset::__memoffset::ptr::slice_from_raw_parts;
+
 use std::mem::size_of;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -44,7 +44,7 @@ impl OopDesc {
         unimplemented!()
     }
 
-    pub fn field_addr(&self, offset: usize) -> Address {
+    pub fn field_addr(&self, _offset: usize) -> Address {
         unimplemented!()
     }
 
@@ -116,11 +116,11 @@ impl ArrayOopDesc {
         size_of::<ArrayOopDesc>()
     }
 
-    pub fn base_offset_in_bytes(ty: BasicType) -> usize {
+    pub fn base_offset_in_bytes(_ty: BasicType) -> usize {
         Self::header_size_in_bytes()
     }
 
-    pub fn header_size(ty: BasicType) -> usize {
+    pub fn header_size(_ty: BasicType) -> usize {
         let type_size_in_bytes = Self::header_size_in_bytes();
         type_size_in_bytes / HEAP_WORD_SIZE
     }

@@ -1,10 +1,10 @@
 use crate::gc::address::Address;
-use crate::gc::global_definition::BasicType;
+
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, OopDesc};
-use field_offset::__memoffset::ptr::slice_from_raw_parts;
+
 use nom::lib::std::ops::DerefMut;
 use std::ops::Deref;
-use std::{mem, slice};
+use std::{mem};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(C)]

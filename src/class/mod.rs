@@ -13,16 +13,16 @@ pub use self::instance_class::InstanceClass;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
 pub use self::instance_mirror_class::InstanceMirrorClass;
 use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
-use crate::class_loader::{get_class_by_id, get_class_id_by_name};
+use crate::class_loader::{get_class_id_by_name};
 use crate::class_parser::constant_pool::ConstPool;
-use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
+
 use crate::gc::global_definition::{
     BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
 };
-use crate::gc::oop::{InstanceOop, Oop};
-use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, OopDesc};
+use crate::gc::oop::{Oop};
+use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::alloc_tlab;
-use downcast_rs::{impl_downcast, DowncastSync};
+
 use nom::lib::std::collections::hash_map::RandomState;
 use nom::lib::std::collections::HashMap;
 use std::fmt;
@@ -72,7 +72,7 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn set_ty(&self, ty: ClassType) {
+    pub fn set_ty(&self, _ty: ClassType) {
         unimplemented!()
     }
 
@@ -112,11 +112,11 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn set_mirror_class(&self, oop: Oop) {
+    pub fn set_mirror_class(&self, _oop: Oop) {
         unimplemented!()
     }
 
-    pub fn set_instance_size(&self, size: usize) {
+    pub fn set_instance_size(&self, _size: usize) {
         unimplemented!()
     }
 
@@ -160,7 +160,7 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn did_implement_interface(&self, interface: Class) -> bool {
+    pub fn did_implement_interface(&self, _interface: Class) -> bool {
         unimplemented!()
     }
 
@@ -172,44 +172,44 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn get_self_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+    pub fn get_self_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
         unimplemented!()
     }
 
-    pub fn get_interface_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+    pub fn get_interface_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
         unimplemented!()
     }
 
-    pub fn get_self_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
+    pub fn get_self_method(&self, _name: &str, _descriptor: &str, _is_static: bool) -> Option<Method> {
         unimplemented!()
     }
 
     pub fn get_class_method(
         &self,
-        name: &str,
-        descriptor: &str,
-        is_static: bool,
+        _name: &str,
+        _descriptor: &str,
+        _is_static: bool,
     ) -> Option<Method> {
         unimplemented!()
     }
 
-    pub fn get_interface_method(&self, name: &str, descriptor: &str) -> Option<Method> {
+    pub fn get_interface_method(&self, _name: &str, _descriptor: &str) -> Option<Method> {
         unimplemented!()
     }
 
-    pub fn get_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
+    pub fn get_method(&self, _name: &str, _descriptor: &str, _is_static: bool) -> Option<Method> {
         unimplemented!()
     }
 
-    pub fn get_static_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+    pub fn get_static_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
         unimplemented!()
     }
 
-    pub fn get_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+    pub fn get_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
         unimplemented!()
     }
 
-    pub fn is_subclass_of(&self, class: Class) -> bool {
+    pub fn is_subclass_of(&self, _class: Class) -> bool {
         unimplemented!()
     }
 
@@ -235,7 +235,7 @@ pub enum ClassType {
 
 pub fn alloc_jobject(class: &Class) -> JObject {
     let size = class.instance_size() + InstanceOopDesc::header_size_in_bytes();
-    let oop = alloc_tlab(size);
+    let _oop = alloc_tlab(size);
 
     JObject::new(alloc_tlab(size), get_class_id_by_name(class.name()))
 }

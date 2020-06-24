@@ -1,8 +1,8 @@
 use crate::class::{alloc_jobject, Class, ClassId, InstanceMirrorClass};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
-use crate::class_loader::class_path::ClassPath;
+
 use crate::gc::global_definition::JObject;
-use crate::gc::oop::{InstanceOop, Oop};
+
 use crate::jenv::JTHREAD;
 use crate::jvm::execute_method;
 use nom::lib::std::collections::HashMap;
@@ -59,7 +59,7 @@ fn get_class_by_name(name: &str) -> Option<Class> {
     Some(g.classes.get(*id)?.clone())
 }
 
-fn register_class(class: Class, loader: JObject) -> ClassId {
+fn register_class(class: Class, _loader: JObject) -> ClassId {
     let clinit_method = class.clinit_method();
     if let Some(clinit_method) = clinit_method {
         JTHREAD.with(|thread| {

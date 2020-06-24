@@ -8,7 +8,7 @@ use crate::class_parser::{
     ACC_STATIC, ACC_VARARGS,
 };
 use crate::gc::global_definition::JObject;
-use crate::gc::oop::{InstanceOop, Oop};
+
 use std::fmt;
 use std::sync::{Arc, Mutex};
 

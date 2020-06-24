@@ -1,4 +1,4 @@
-use crate::class::{Class, ClassType, InnerClass};
+use crate::class::{Class, InnerClass};
 use std::sync::Arc;
 
 pub struct InstanceClassLoaderClass {

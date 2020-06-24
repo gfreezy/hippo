@@ -2,7 +2,7 @@ use crate::class::{Class, InnerClass};
 use crate::class_loader::load_class;
 use crate::gc::global_definition::JObject;
 use crate::gc::mem::align_usize;
-use crate::gc::oop::{InstanceOop, Oop};
+
 use crate::java_const::JAVA_LANG_CLASS;
 use std::sync::Arc;
 

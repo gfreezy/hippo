@@ -1,12 +1,12 @@
-use crate::class::{alloc_jobject, InnerClass, InstanceClass, InstanceMirrorClass};
+use crate::class::{alloc_jobject, InstanceClass, InstanceMirrorClass};
 use crate::class::{Class, ClassId};
 use crate::class_loader::class_path::ClassPath;
 use crate::class_loader::load_class;
 use crate::class_parser::parse_class_file;
 use crate::gc::global_definition::JObject;
-use crate::gc::oop::Oop;
+
 use nom::lib::std::collections::HashSet;
-use std::collections::HashMap;
+
 use tracing::debug;
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl BootstrapClassLoader {
         let name_bytes = name.as_bytes();
         let class: Class = match name_bytes {
             [b'[', .., b'L'] => unimplemented!(),
-            [b'[', ty, ..] => unimplemented!(),
+            [b'[', _ty, ..] => unimplemented!(),
             [b'L', name_slice @ .., b';'] | name_slice => {
                 let name = std::str::from_utf8(name_slice).unwrap();
                 let data = self

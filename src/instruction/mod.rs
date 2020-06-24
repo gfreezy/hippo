@@ -6,7 +6,7 @@ use crate::class::Class;
 use crate::class_loader::{get_class_by_id, load_class};
 use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::gc::global_definition::{JObject, JValue};
-use crate::gc::oop::ArrayOop;
+
 use crate::java_const::JAVA_LANG_OBJECT;
 use crate::jenv::{
     did_override_method, new_java_lang_string, new_jobject, new_jobject_array, new_jtype_array,

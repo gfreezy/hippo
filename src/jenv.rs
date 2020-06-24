@@ -1,9 +1,9 @@
 use crate::class::{alloc_jarray, alloc_jobject, Class, Method};
 use crate::class_loader::{get_class_id_by_name, load_class};
-use crate::frame::JvmFrame;
+
 use crate::gc::global_definition::{BasicType, JArray, JObject};
-use crate::gc::oop::{InstanceOop, Oop};
-use crate::gc::oop_desc::{InstanceOopDesc, OopDesc};
+
+
 use crate::java_const::JAVA_LANG_STRING;
 use crate::jthread::JvmThread;
 use std::cell::RefCell;

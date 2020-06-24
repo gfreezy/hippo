@@ -1,5 +1,5 @@
-use crate::gc::global_definition::{JObject, JValue};
-use crate::gc::oop::Oop;
+use crate::gc::global_definition::{JValue};
+
 
 #[derive(Debug)]
 pub struct LocalVariableArray {

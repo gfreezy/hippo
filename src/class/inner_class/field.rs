@@ -1,7 +1,7 @@
-use crate::class_parser::field_info::FieldInfo;
+
 use crate::class_parser::{ACC_FINAL, ACC_STATIC};
 use crate::gc::global_definition::{JArray, JObject, JValue};
-use crate::gc::oop::{InstanceOop, Oop};
+
 
 #[derive(Debug, Clone)]
 pub struct Field {

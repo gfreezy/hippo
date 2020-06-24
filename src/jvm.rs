@@ -4,7 +4,7 @@ use crate::class_loader::class_path::ClassPath;
 use crate::class_loader::{load_class, BOOTSTRAP_LOADER};
 use crate::frame::JvmFrame;
 use crate::gc::global_definition::{JObject, JValue};
-use crate::gc::oop::InstanceOop;
+
 use crate::instruction::opcode::show_opcode;
 use crate::instruction::*;
 use crate::jenv::JTHREAD;
@@ -41,7 +41,7 @@ impl Drop for Jvm {
 
 impl Jvm {
     pub fn new(class_name: &str, jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
-        let mut jvm = Jvm {
+        let jvm = Jvm {
             main_class: class_name.to_string(),
         };
         BOOTSTRAP_LOADER.set(Mutex::new(BootstrapClassLoader::new(ClassPath::new(
