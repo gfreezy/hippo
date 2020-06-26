@@ -3,8 +3,8 @@ use crate::gc::address::Address;
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, OopDesc};
 
 use nom::lib::std::ops::DerefMut;
+use std::mem;
 use std::ops::Deref;
-use std::{mem};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(C)]
@@ -42,7 +42,7 @@ pub struct InstanceOop(pub Oop);
 
 impl InstanceOop {
     pub fn empty() -> Self {
-        unsafe { Oop::empty() }.into()
+        Oop::empty().into()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -70,7 +70,7 @@ impl ArrayOop {
         self.0
     }
     pub fn empty() -> ArrayOop {
-        unsafe { ArrayOop(Oop::empty()) }
+        ArrayOop(Oop::empty())
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()

@@ -13,13 +13,13 @@ pub use self::instance_class::InstanceClass;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
 pub use self::instance_mirror_class::InstanceMirrorClass;
 use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
-use crate::class_loader::{get_class_id_by_name};
+use crate::class_loader::get_class_id_by_name;
 use crate::class_parser::constant_pool::ConstPool;
 
 use crate::gc::global_definition::{
     BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
 };
-use crate::gc::oop::{Oop};
+use crate::gc::oop::Oop;
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::alloc_tlab;
 
@@ -165,7 +165,13 @@ impl Class {
     }
 
     pub fn clinit_method(&self) -> Option<Method> {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.clinit_method(),
+            Class::InstanceClassLoaderClass(c) => c.clinit_method(),
+            Class::InstanceMirrorClass(c) => c.clinit_method(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn total_instance_fields(&self) -> usize {
@@ -180,7 +186,12 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn get_self_method(&self, _name: &str, _descriptor: &str, _is_static: bool) -> Option<Method> {
+    pub fn get_self_method(
+        &self,
+        _name: &str,
+        _descriptor: &str,
+        _is_static: bool,
+    ) -> Option<Method> {
         unimplemented!()
     }
 

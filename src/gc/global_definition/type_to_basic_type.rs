@@ -3,7 +3,6 @@ use crate::gc::global_definition::{
     JValue,
 };
 
-
 pub struct TypeToBasicType<T> {
     v: Option<T>,
 }
@@ -93,7 +92,6 @@ impl From<TypeToBasicType<JValue>> for BasicType {
             Some(JValue::Int(inner)) => type_to_basic_type(Some(inner)),
             Some(JValue::Long(inner)) => type_to_basic_type(Some(inner)),
             Some(JValue::Object(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Int(inner)) => type_to_basic_type(Some(inner)),
             Some(JValue::Array(inner)) => type_to_basic_type(Some(inner)),
             None => unreachable!(),
         }

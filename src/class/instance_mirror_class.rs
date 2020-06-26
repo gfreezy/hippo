@@ -4,6 +4,7 @@ use crate::gc::global_definition::JObject;
 use crate::gc::mem::align_usize;
 
 use crate::java_const::JAVA_LANG_CLASS;
+use crate::jthread::JvmThread;
 use std::sync::Arc;
 
 pub struct InstanceMirrorClass {
@@ -12,29 +13,12 @@ pub struct InstanceMirrorClass {
     class_name: String,
 }
 
-impl From<Class> for InstanceMirrorClass {
-    fn from(class: Class) -> Self {
-        let loader = class.class_loader();
-        let class = load_class(loader, JAVA_LANG_CLASS);
-        let java_class = load_class(loader, class.name());
-        let java_class_static_size = java_class.instance_size();
-        let self_instance_size = class.instance_size();
-        let offset = align_usize(self_instance_size, 8);
-        class.set_instance_size(offset + java_class_static_size);
-        InstanceMirrorClass {
-            class_name: class.name().to_string(),
-            class: class.inner(),
-            base_static_offset: offset,
-        }
-    }
-}
-
 impl_instance_class!(InstanceMirrorClass);
 
 impl InstanceMirrorClass {
-    pub fn new(name: &str, loader: JObject) -> Self {
-        let class = load_class(loader, JAVA_LANG_CLASS);
-        let java_class = load_class(loader, name);
+    pub fn new(name: &str, thread: &mut JvmThread, loader: JObject) -> Self {
+        let class = load_class(thread, loader, JAVA_LANG_CLASS);
+        let java_class = load_class(thread, loader, name);
         let java_class_static_size = java_class.instance_size();
         let self_instance_size = class.instance_size();
         let offset = align_usize(self_instance_size, 8);

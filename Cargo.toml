@@ -19,7 +19,7 @@ lazy_static = "1.4.0"
 once_cell = "1.4.0"
 derivative = "2.1.1"
 libc = "0.2.71"
-parking_lot = "0.10.2"
+parking_lot = { version = "0.10.2", features = ["deadlock_detection"]}
 field-offset = "0.3.1"
 downcast-rs = "1.1.1"
 

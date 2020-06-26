@@ -99,7 +99,6 @@ impl ClassPath {
         self.boot
             .read_class(&class_file_name)
             .or_else(|_x| self.user.read_class(&class_file_name))
-        //            .or_else(|| self.ext.read_class())
     }
 
     pub fn new(jre_opt: Option<String>, cp_opt: Option<String>) -> ClassPath {

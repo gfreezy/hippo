@@ -7,7 +7,6 @@ use parking_lot::Mutex;
 use std::collections::LinkedList;
 use std::fmt;
 
-
 pub struct Space {
     start: Address,
     end: Address,
@@ -55,8 +54,8 @@ impl Space {
         self.used_blocks.lock().push_back(block)
     }
 
-    pub fn get_next_usable_block(&self) -> Block {
-        self.usable_blocks.lock().pop_front().expect("OOM")
+    pub fn get_next_usable_block(&self) -> Option<Block> {
+        self.usable_blocks.lock().pop_front()
     }
 }
 
@@ -70,5 +69,55 @@ impl Drop for Space {
 impl fmt::Debug for Space {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Space")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_spaces() {
+        test_new_space(1);
+        test_new_space(10);
+        test_new_space(1024);
+        test_new_space(20 * 1024 * 1024);
+    }
+
+    fn test_new_space(size: usize) {
+        let space = Space::new(size);
+        assert_eq!(space.end.diff(space.start), align_usize(size, BLOCK_SIZE));
+    }
+
+    #[test]
+    fn test_no_more_block() {
+        let size = 1024 * 1024;
+        let space = Space::new(size);
+        let block = space.get_next_usable_block().unwrap();
+        assert_eq!(block.start.diff(block.end), align_usize(size, BLOCK_SIZE));
+        let block = space.get_next_usable_block();
+        assert!(block.is_none());
+    }
+
+    #[test]
+    fn test_no_more_block2() {
+        let size = BLOCK_SIZE;
+        let space = Space::new(size);
+        let block = space.get_next_usable_block().unwrap();
+        assert_eq!(block.start.diff(block.end), align_usize(size, BLOCK_SIZE));
+        let block = space.get_next_usable_block();
+        assert!(block.is_none());
+    }
+
+    #[test]
+    fn test_have_2_blocks() {
+        let size = BLOCK_SIZE + 1;
+        let space = Space::new(size);
+        let block = space.get_next_usable_block().unwrap();
+        assert_eq!(block.start.diff(block.end), BLOCK_SIZE);
+        let block = space.get_next_usable_block();
+        assert!(block.is_some());
+        let block = space.get_next_usable_block();
+        assert!(block.is_none());
     }
 }

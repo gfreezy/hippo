@@ -1,13 +1,13 @@
-use crate::class::{alloc_jobject, Class, ClassId, InstanceMirrorClass};
+use crate::class::{Class, ClassId};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 
 use crate::gc::global_definition::JObject;
 
-use crate::jenv::JTHREAD;
+use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
 use nom::lib::std::collections::HashMap;
 use once_cell::sync::OnceCell;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use std::collections::hash_map::Entry;
 
 struct GlobalClasses {
@@ -38,7 +38,7 @@ impl GlobalClasses {
 lazy_static::lazy_static! {
     static ref GLOBAL_CLASSES: GlobalClasses = GlobalClasses::new();
 }
-pub static BOOTSTRAP_LOADER: OnceCell<Mutex<BootstrapClassLoader>> = OnceCell::new();
+pub static BOOTSTRAP_LOADER: OnceCell<BootstrapClassLoader> = OnceCell::new();
 
 pub fn get_class_by_id(id: ClassId) -> Class {
     let g = GLOBAL_CLASSES.inner.read();
@@ -59,13 +59,7 @@ fn get_class_by_name(name: &str) -> Option<Class> {
     Some(g.classes.get(*id)?.clone())
 }
 
-fn register_class(class: Class, _loader: JObject) -> ClassId {
-    let clinit_method = class.clinit_method();
-    if let Some(clinit_method) = clinit_method {
-        JTHREAD.with(|thread| {
-            execute_method(&mut thread.borrow_mut(), clinit_method, vec![]);
-        });
-    }
+fn register_class(thread: &mut JvmThread, class: Class, _loader: JObject) -> ClassId {
     let mut g = GLOBAL_CLASSES.inner.write();
     let Inner { classes, map, .. } = &mut *g;
     let entry = map.entry(class.name().to_string());
@@ -73,26 +67,28 @@ fn register_class(class: Class, _loader: JObject) -> ClassId {
         return *occupied.get();
     }
     let class_id = classes.len();
-    classes.push(class);
+    classes.push(class.clone());
     entry.or_insert(class_id);
+    let clinit_method = class.clinit_method();
+    if let Some(clinit_method) = clinit_method {
+        execute_method(thread, clinit_method, vec![]);
+    }
     class_id
 }
 
-pub fn load_class(loader: JObject, name: &str) -> Class {
+pub fn load_class(thread: &mut JvmThread, loader: JObject, name: &str) -> Class {
     if let Some(class) = get_class_by_name(name) {
         assert_eq!(class.class_loader(), loader);
         return class;
     }
 
     if loader.is_null() {
-        let mut boot_loader = BOOTSTRAP_LOADER
-            .get()
-            .expect("get bootstarap_loader")
-            .lock();
-        let class = boot_loader.load_class(name);
-        let _class_id = register_class(class.clone(), loader.clone());
+        println!("load class {}", name);
+        let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstarap_loader");
+        let class = boot_loader.load_class(thread, name);
         return class;
     }
+    // let _class_id = register_class(thread, class.clone(), loader.clone());
     unimplemented!()
 }
 

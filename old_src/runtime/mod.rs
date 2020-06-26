@@ -56,7 +56,7 @@ impl Jvm {
             jenv: JvmEnv::new(jre_opt, cp_opt),
             main_class: class_name.to_string(),
         };
-        let system_class = jvm.load_class(class.class_loader(), "java/lang/System");
+        let system_class = jvm.load_class(thread, class.class_loader(), "java/lang/System");
         let system_class_initialize = system_class
             .get_method("initializeSystemClass", "()V", true)
             .expect("system init");
@@ -76,7 +76,7 @@ impl Jvm {
 
 fn execute_method(jenv: &mut JvmEnv, method: Method, args: Vec<Operand>) {
     let is_native = method.is_native();
-    let class = load_class(class.class_loader(), method.class_name());
+    let class = load_class(thread, class.class_loader(), method.class_name());
 
     let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();

@@ -21,7 +21,7 @@ impl AllocatorLocal {
     }
 
     pub fn new(space: Arc<Space>) -> AllocatorLocal {
-        let block = space.get_next_usable_block();
+        let block = space.get_next_usable_block().unwrap();
         AllocatorLocal {
             cursor: block.start,
             end: block.end,
@@ -35,7 +35,10 @@ impl AllocatorLocal {
             self.space.return_used_block(block);
         }
 
-        self.block = Some(self.space.get_next_usable_block());
+        let block = self.space.get_next_usable_block().unwrap();
+        self.cursor = block.start;
+        self.end = block.end;
+        self.block = Some(block);
         self.alloc(size, align)
     }
 

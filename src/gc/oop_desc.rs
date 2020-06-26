@@ -3,9 +3,7 @@ use crate::gc::address::Address;
 use crate::gc::global_definition::type_to_basic_type::{
     size_of_java_type, type_to_basic_type, TypeToBasicType,
 };
-use crate::gc::global_definition::{
-    BasicType, JObject, HEAP_OOP_SIZE, HEAP_WORDS_PER_LONG, HEAP_WORD_SIZE, LOG_HEAP_WORD_SIZE,
-};
+use crate::gc::global_definition::{BasicType, HEAP_WORD_SIZE};
 use crate::gc::mark_word::MarkWord;
 use crate::gc::mem::align_usize;
 use field_offset::__memoffset::mem::transmute;

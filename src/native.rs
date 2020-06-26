@@ -7,15 +7,14 @@ use crate::jenv::{get_java_string, new_java_lang_string};
 use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
 
-
 pub fn java_lang_Class_getPrimitiveClass(
     thread: &mut JvmThread,
     class: &Class,
     mut args: Vec<JValue>,
 ) {
     let string_ref = args.pop().unwrap();
-    let class_name = get_java_string(string_ref.as_jobject());
-    let primitive_class = load_class(class.class_loader(), &class_name);
+    let class_name = get_java_string(thread, string_ref.as_jobject());
+    let primitive_class = load_class(thread, class.class_loader(), &class_name);
     let frame = thread.current_frame_mut();
     frame
         .operand_stack
@@ -89,8 +88,8 @@ pub fn java_lang_System_initProperties(thread: &mut JvmThread, _class: &Class, a
         ("user.dir", "/Users/feichao"),
     ];
     for (key, value) in systemProperties {
-        let key = JValue::Object(new_java_lang_string(key));
-        let value = JValue::Object(new_java_lang_string(value));
+        let key = JValue::Object(new_java_lang_string(thread, key));
+        let value = JValue::Object(new_java_lang_string(thread, value));
         let args = vec![props_ref.clone(), key, value];
         execute_method(thread, method.clone(), args);
     }
@@ -180,15 +179,18 @@ pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, arg
 }
 
 pub fn java_lang_Class_getName0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let addr = new_java_lang_string(class.as_instance_mirror_class().mirrored_class_name());
+    let addr = new_java_lang_string(
+        thread,
+        class.as_instance_mirror_class().mirrored_class_name(),
+    );
     thread.current_frame_mut().operand_stack.push_jobject(addr);
 }
 
 pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let name = get_java_string(args[0].as_jobject());
+    let name = get_java_string(thread, args[0].as_jobject());
     let class_name = name.replace('.', "/");
     eprintln!("class_for_Name0: {}", &class_name);
-    let class = load_class(class.class_loader(), &class_name);
+    let class = load_class(thread, class.class_loader(), &class_name);
     thread
         .current_frame_mut()
         .operand_stack

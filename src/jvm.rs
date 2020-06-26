@@ -10,7 +10,6 @@ use crate::instruction::*;
 use crate::jenv::JTHREAD;
 use crate::jthread::JvmThread;
 use crate::native::*;
-use parking_lot::Mutex;
 use tracing::debug;
 
 #[derive(Debug)]
@@ -44,34 +43,36 @@ impl Jvm {
         let jvm = Jvm {
             main_class: class_name.to_string(),
         };
-        BOOTSTRAP_LOADER.set(Mutex::new(BootstrapClassLoader::new(ClassPath::new(
-            jre_opt, cp_opt,
-        ))));
+        BOOTSTRAP_LOADER.set(BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)));
 
-        let system_class = load_class(JObject::null(), "java/lang/System");
-        let system_class_initialize = system_class
-            .get_method("initializeSystemClass", "()V", true)
-            .expect("system init");
         JTHREAD.with(|thread| {
-            execute_method(&mut thread.borrow_mut(), system_class_initialize, vec![]);
+            let mut thread = thread.borrow_mut();
+            let system_class = load_class(&mut thread, JObject::null(), "java/lang/System");
+            let system_class_initialize = system_class
+                .get_method("initializeSystemClass", "()V", true)
+                .expect("system init");
+
+            execute_method(&mut thread, system_class_initialize, vec![]);
         });
         jvm
     }
 
     pub fn run(&mut self) {
-        let class = load_class(JObject::null(), &self.main_class);
-        let main_method = class
-            .get_method("main", "([Ljava/lang/String;)V", true)
-            .unwrap();
         JTHREAD.with(|thread| {
-            execute_method(&mut thread.borrow_mut(), main_method, vec![]);
+            let mut thread = thread.borrow_mut();
+            let class = load_class(&mut thread, JObject::null(), &self.main_class);
+            let main_method = class
+                .get_method("main", "([Ljava/lang/String;)V", true)
+                .unwrap();
+
+            execute_method(&mut thread, main_method, vec![]);
         });
     }
 }
 
 pub fn execute_method(thread: &mut JvmThread, method: Method, args: Vec<JValue>) {
     let is_native = method.is_native();
-    let class = load_class(method.class_loader(), method.class_name());
+    let class = load_class(thread, method.class_loader(), method.class_name());
 
     let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();

@@ -45,7 +45,7 @@ pub fn java_lang_System_initProperties(jenv: &mut JvmEnv, _class: &Class, args: 
     let props_ref = &args[0];
     let properties = jenv.heap.get_object(props_ref);
     let class_name = properties.class_name().to_string();
-    let propertiesClass = load_class(class.class_loader(), &class_name);
+    let propertiesClass = load_class(thread, class.class_loader(), &class_name);
     let method = propertiesClass
         .get_method(
             "put",
@@ -177,7 +177,7 @@ pub fn java_security_AccessController_doPrivileged(
 ) {
     let action = &args[0];
     let class_name = jenv.heap.get_class_name(action);
-    let class = load_class(class.class_loader(), &class_name);
+    let class = load_class(thread, class.class_loader(), &class_name);
     let method = class
         .get_method("run", "()Ljava/lang/Object;", false)
         .unwrap();
@@ -209,7 +209,7 @@ pub fn java_lang_Class_for_Name0(jenv: &mut JvmEnv, class: &Class, args: Vec<Ope
     let name = jenv.get_java_string(&args[0]);
     let class_name = name.replace('.', "/");
     eprintln!("class_for_Name0: {}", &class_name);
-    let _class = load_class(class.class_loader(), &class_name);
+    let _class = load_class(thread, class.class_loader(), &class_name);
     let class_addr = jenv.new_java_lang_class(&class_name);
     jenv.thread
         .stack

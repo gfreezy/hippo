@@ -4,7 +4,7 @@ pub mod method;
 
 use crate::class::inner_class::field::descriptor_size_in_bytes;
 use crate::class::inner_class::method::Method;
-use crate::class::{Class};
+use crate::class::Class;
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
@@ -18,11 +18,10 @@ use crate::jenv::new_java_lang_string;
 use field::Field;
 use nom::lib::std::collections::HashMap;
 
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-
-
-use std::sync::atomic::{AtomicU64, Ordering};
-
+use crate::jthread::JvmThread;
+use std::sync::atomic::Ordering::SeqCst;
 use tracing::trace;
 
 #[repr(C)]
@@ -39,6 +38,7 @@ pub struct InnerClass {
     instance_size: AtomicU64,
     static_size: usize,
     loader: JObject,
+    inited: AtomicBool,
 }
 
 impl InnerClass {
@@ -121,6 +121,7 @@ impl InnerClass {
             instance_size: AtomicU64::new(instance_offset as u64),
             static_size: static_offset,
             loader,
+            inited: AtomicBool::new(false),
         };
         inner_class
     }
@@ -375,6 +376,7 @@ impl Iterator for SuperClassesIter {
 }
 
 fn get_default_value_from_field_info(
+    thread: &mut JvmThread,
     field_info: &FieldInfo,
     const_pool: &ConstPool,
 ) -> Option<JValue> {
@@ -392,6 +394,7 @@ fn get_default_value_from_field_info(
             "F" => JValue::Float(const_pool.get_constant_float_at(constant_value_index)),
             "J" => JValue::Long(const_pool.get_constant_long_at(constant_value_index)),
             "Ljava/lang/String;" => JValue::Object(new_java_lang_string(
+                thread,
                 const_pool.get_constant_string_at(constant_value_index),
             )),
             _ => unreachable!(),

@@ -1,4 +1,3 @@
-
 use crate::class::{Class, InnerClass};
 use crate::class_parser::ClassFile;
 use crate::gc::global_definition::JObject;

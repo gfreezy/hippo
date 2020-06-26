@@ -195,7 +195,7 @@ pub fn invokestatic(jenv: &mut JvmEnv, class: &Class) {
         .get_class_method_or_interface_method_at(index);
 
     let class_name = method_ref.class_name;
-    let class = load_class(class.class_loader(), class_name);
+    let class = load_class(thread, class.class_loader(), class_name);
     let method = class
         .get_method(method_ref.method_name, method_ref.descriptor, true)
         .expect("get method");
@@ -255,7 +255,7 @@ pub fn getstatic(jenv: &mut JvmEnv, class: &Class) {
         v
     } else {
         let field_ref = class.constant_pool().get_field_ref_at(index);
-        let field_class = load_class(class.class_loader(), field_ref.class_name);
+        let field_class = load_class(thread, class.class_loader(), field_ref.class_name);
         let field = field_class
             .get_static_field(field_ref.field_name, field_ref.descriptor)
             .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
@@ -282,7 +282,7 @@ pub fn putstatic(jenv: &mut JvmEnv, class: &Class) {
         v
     } else {
         let field_ref = class.constant_pool().get_field_ref_at(index);
-        let field_class = load_class(class.class_loader(), field_ref.class_name);
+        let field_class = load_class(thread, class.class_loader(), field_ref.class_name);
         let field = field_class
             .get_static_field(field_ref.field_name, field_ref.descriptor)
             .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
@@ -305,7 +305,7 @@ pub fn invokevirtual(jenv: &mut JvmEnv, class: &Class) {
     let index = frame.read_u16().unwrap();
     let method_ref = class.constant_pool().get_method_ref_at(index);
     debug!(?method_ref, "invokevirtual");
-    let resolved_class = load_class(class.class_loader(), method_ref.class_name);
+    let resolved_class = load_class(thread, class.class_loader(), method_ref.class_name);
     let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
         .unwrap_or_else(|| panic!("get method: {}", &method_ref.method_name));
@@ -329,7 +329,7 @@ pub fn invokevirtual(jenv: &mut JvmEnv, class: &Class) {
     }
 
     let class_name = jenv.heap.get_class_name(&object_ref);
-    let object_class = load_class(class.class_loader(), &class_name);
+    let object_class = load_class(thread, class.class_loader(), &class_name);
 
     let acutal_method = if !resolved_method.is_signature_polymorphic() {
         if let Some(actual_method) = object_class
@@ -356,7 +356,7 @@ pub fn invokevirtual(jenv: &mut JvmEnv, class: &Class) {
         unimplemented!("is_signature_polymorphic")
     };
 
-    let actual_class = load_class(class.class_loader(), acutal_method.class_name());
+    let actual_class = load_class(thread, class.class_loader(), acutal_method.class_name());
 
     execute_method(acutal_method, args);
 }
@@ -370,7 +370,7 @@ pub fn invokeinterface(jenv: &mut JvmEnv, class: &Class) {
     assert_eq!(forth, 0);
     let method_ref = class.constant_pool().get_interface_method_ref_at(index);
     debug!(?method_ref, "invokeinterface");
-    let resolved_class = load_class(class.class_loader(), method_ref.class_name);
+    let resolved_class = load_class(thread, class.class_loader(), method_ref.class_name);
     let resolved_method = resolved_class
         .get_interface_method(method_ref.method_name, method_ref.descriptor)
         .unwrap_or_else(|| panic!("get interface method: {}", &method_ref.method_name));
@@ -394,7 +394,7 @@ pub fn invokeinterface(jenv: &mut JvmEnv, class: &Class) {
     }
 
     let class_name = jenv.heap.get_class_name(&object_ref);
-    let object_class = load_class(class.class_loader(), &class_name);
+    let object_class = load_class(thread, class.class_loader(), &class_name);
 
     let acutal_method = if let Some(actual_method) =
         object_class.get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
@@ -412,7 +412,7 @@ pub fn invokeinterface(jenv: &mut JvmEnv, class: &Class) {
         unreachable!("no method found")
     };
 
-    let actual_class = load_class(class.class_loader(), acutal_method.class_name());
+    let actual_class = load_class(thread, class.class_loader(), acutal_method.class_name());
 
     execute_method(acutal_method, args);
 }
@@ -421,7 +421,7 @@ pub fn new(jenv: &mut JvmEnv, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
-    let class = load_class(class.class_loader(), class_name);
+    let class = load_class(thread, class.class_loader(), class_name);
     let (object, addr) = jenv.heap.new_object(class);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     frame.operand_stack.push(Operand::ObjectRef(addr))
@@ -475,8 +475,8 @@ fn can_cast_to(jenv: &mut JvmEnv, s: Class, t: Class) -> bool {
         (s, Class::InstanceClass(t)) if t.is_interface() => unimplemented!(),
         (Class::TypeArrayClass(s), Class::TypeArrayClass(t)) => s.ty == t.ty,
         (Class::ObjArrayClass(s), Class::ObjArrayClass(t)) => {
-            let sc = load_class(class.class_loader(), &s.class);
-            let tc = load_class(class.class_loader(), &t.class);
+            let sc = load_class(thread, class.class_loader(), &s.class);
+            let tc = load_class(thread, class.class_loader(), &t.class);
             can_cast_to(jenv, sc, tc)
         }
         _ => false,
@@ -487,7 +487,7 @@ pub fn checkcast(jenv: &mut JvmEnv, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
-    let class = load_class(class.class_loader(), class_name);
+    let class = load_class(thread, class.class_loader(), class_name);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let obj_ref = frame.operand_stack.pop();
     if obj_ref == Operand::Null {
@@ -495,7 +495,7 @@ pub fn checkcast(jenv: &mut JvmEnv, class: &Class) {
         return;
     }
     let obj_class_name = jenv.heap.get_class_name(&obj_ref);
-    let obj_class = load_class(class.class_loader(), &obj_class_name);
+    let obj_class = load_class(thread, class.class_loader(), &obj_class_name);
 
     assert!(can_cast_to(jenv, obj_class, class));
 
@@ -535,7 +535,7 @@ pub fn invokespecial(jenv: &mut JvmEnv, class: &Class) {
         .constant_pool()
         .get_class_method_or_interface_method_at(index);
 
-    let resolved_class = load_class(class.class_loader(), method_ref.class_name);
+    let resolved_class = load_class(thread, class.class_loader(), method_ref.class_name);
 
     let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
@@ -600,7 +600,7 @@ pub fn putfield(jenv: &mut JvmEnv, class: &Class) {
         let field_ref = class.constant_pool().get_field_ref_at(index);
         debug!(?object_ref, ?field_ref, "putfield");
         let object_class_name = jenv.heap.get_object(&object_ref).class_name().to_string();
-        let field_class = load_class(class.class_loader(), &object_class_name);
+        let field_class = load_class(thread, class.class_loader(), &object_class_name);
         let class_field = field_class
             .get_field(field_ref.field_name, field_ref.descriptor)
             .unwrap();
@@ -624,7 +624,7 @@ pub fn getfield(jenv: &mut JvmEnv, class: &Class) {
     } else {
         let field_ref = class.constant_pool().get_field_ref_at(index);
         let object_class_name = jenv.heap.get_object(&object_ref).class_name().to_string();
-        let obj_class = load_class(class.class_loader(), &object_class_name);
+        let obj_class = load_class(thread, class.class_loader(), &object_class_name);
         let class_field = obj_class
             .get_field(field_ref.field_name, field_ref.descriptor)
             .unwrap();
@@ -926,7 +926,7 @@ pub fn instanceof(jenv: &mut JvmEnv, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
-    let class = load_class(class.class_loader(), class_name);
+    let class = load_class(thread, class.class_loader(), class_name);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let obj_ref = frame.operand_stack.pop();
     if obj_ref == Operand::Null {
@@ -934,7 +934,7 @@ pub fn instanceof(jenv: &mut JvmEnv, class: &Class) {
         return;
     }
     let obj_class_name = jenv.heap.get_class_name(&obj_ref);
-    let obj_class = load_class(class.class_loader(), &obj_class_name);
+    let obj_class = load_class(thread, class.class_loader(), &obj_class_name);
     let v = if can_cast_to(jenv, obj_class, class) {
         1
     } else {
@@ -948,7 +948,7 @@ pub fn athrow(jenv: &mut JvmEnv, class: &Class) {
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
-    let class = load_class(class.class_loader(), class_name);
+    let class = load_class(thread, class.class_loader(), class_name);
     let frame = jenv.thread.stack.frames.back_mut().unwrap();
     let obj_ref = frame.operand_stack.pop();
     if obj_ref == Operand::Null {
@@ -956,7 +956,7 @@ pub fn athrow(jenv: &mut JvmEnv, class: &Class) {
         return;
     }
     let obj_class_name = jenv.heap.get_class_name(&obj_ref);
-    let obj_class = load_class(class.class_loader(), &obj_class_name);
+    let obj_class = load_class(thread, class.class_loader(), &obj_class_name);
     let v = if can_cast_to(jenv, obj_class, class) {
         1
     } else {

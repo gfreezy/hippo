@@ -97,7 +97,7 @@ impl JvmEnv {
         }
 
         let mut class = if class_loader_addr == Operand::Null {
-            let class = self.bootstrap_class_loader.load_class(class_name);
+            let class = self.bootstrap_class_loader.load_class(thread, class_name);
             self.defining_classes.insert(
                 ClassId {
                     name: class_name.to_string(),
