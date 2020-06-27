@@ -94,6 +94,10 @@ macro_rules! impl_instance_class {
                 self.class.iter_super_classes()
             }
 
+            pub fn set_mirror_class(&self, mirror: crate::gc::global_definition::JObject) {
+                self.class.set_mirror_class(mirror);
+            }
+
             pub fn did_implement_interface(&self, interface: crate::class::Class) -> bool {
                 self.class.did_implement_interface(interface)
             }
@@ -164,18 +168,10 @@ impl InstanceClass {
         class_file: ClassFile,
         super_class: Option<Class>,
         interfaces: Vec<Class>,
-        mirror_class: JObject,
         loader: JObject,
     ) -> Self {
         InstanceClass {
-            class: InnerClass::new(
-                name,
-                class_file,
-                super_class,
-                interfaces,
-                mirror_class,
-                loader,
-            ),
+            class: InnerClass::new(name, class_file, super_class, interfaces, loader),
         }
     }
     pub fn instance_size(&self) -> usize {

@@ -22,6 +22,7 @@ libc = "0.2.71"
 parking_lot = { version = "0.10.2", features = ["deadlock_detection"]}
 field-offset = "0.3.1"
 downcast-rs = "1.1.1"
+crossbeam = "0.7.3"
 
 [dev-dependencies]
 insta = "0.16.0"

@@ -1,10 +1,11 @@
-use crate::class::{Class, ClassId};
+use crate::class::{alloc_jobject, Class, ClassId, InstanceMirrorClass};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 
 use crate::gc::global_definition::JObject;
 
+use crate::java_const::{JAVA_LANG_CLASS, JAVA_LANG_OBJECT};
 use crate::jthread::JvmThread;
-use crate::jvm::execute_method;
+use crate::jvm::{execute_class_method, execute_method};
 use nom::lib::std::collections::HashMap;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
@@ -59,37 +60,44 @@ fn get_class_by_name(name: &str) -> Option<Class> {
     Some(g.classes.get(*id)?.clone())
 }
 
-fn register_class(thread: &mut JvmThread, class: Class, _loader: JObject) -> ClassId {
-    let mut g = GLOBAL_CLASSES.inner.write();
-    let Inner { classes, map, .. } = &mut *g;
-    let entry = map.entry(class.name().to_string());
-    if let Entry::Occupied(occupied) = entry {
-        return *occupied.get();
-    }
-    let class_id = classes.len();
-    classes.push(class.clone());
-    entry.or_insert(class_id);
-    let clinit_method = class.clinit_method();
-    if let Some(clinit_method) = clinit_method {
-        execute_method(thread, clinit_method, vec![]);
-    }
+fn register_class(class: Class, loader: JObject) -> ClassId {
+    println!("register class {}", class.name());
+
+    let class_id = {
+        let mut g = GLOBAL_CLASSES.inner.write();
+        let Inner { classes, map, .. } = &mut *g;
+        let entry = map.entry(class.name().to_string());
+        if let Entry::Occupied(occupied) = entry {
+            return *occupied.get();
+        }
+        let class_id = classes.len();
+        classes.push(class.clone());
+        entry.or_insert(class_id);
+        class_id
+    };
+    //
+    // let clinit_method = class.clinit_method();
+    // if let Some(clinit_method) = clinit_method {
+    //     execute_class_method(thread, class, clinit_method, vec![]);
+    // }
     class_id
 }
 
-pub fn load_class(thread: &mut JvmThread, loader: JObject, name: &str) -> Class {
+pub fn load_class(loader: JObject, name: &str) -> Class {
     if let Some(class) = get_class_by_name(name) {
         assert_eq!(class.class_loader(), loader);
         return class;
     }
 
-    if loader.is_null() {
+    let class = if loader.is_null() {
         println!("load class {}", name);
         let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstarap_loader");
-        let class = boot_loader.load_class(thread, name);
-        return class;
-    }
-    // let _class_id = register_class(thread, class.clone(), loader.clone());
-    unimplemented!()
+        boot_loader.load_class(name)
+    } else {
+        unreachable!()
+    };
+    let _class_id = register_class(class.clone(), loader.clone());
+    class
 }
 
 pub mod bootstrap_class_loader;

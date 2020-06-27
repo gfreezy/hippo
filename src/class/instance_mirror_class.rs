@@ -16,10 +16,10 @@ pub struct InstanceMirrorClass {
 impl_instance_class!(InstanceMirrorClass);
 
 impl InstanceMirrorClass {
-    pub fn new(name: &str, thread: &mut JvmThread, loader: JObject) -> Self {
-        let class = load_class(thread, loader, JAVA_LANG_CLASS);
-        let java_class = load_class(thread, loader, name);
-        let java_class_static_size = java_class.instance_size();
+    pub fn new(name: &str, loader: JObject) -> Self {
+        let java_class = load_class(loader, name);
+        let class = load_class(loader, JAVA_LANG_CLASS);
+        let java_class_static_size = java_class.static_size();
         let self_instance_size = class.instance_size();
         let offset = align_usize(self_instance_size, 8);
         class.set_instance_size(offset + java_class_static_size);

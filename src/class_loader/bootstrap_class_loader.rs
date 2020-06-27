@@ -4,8 +4,8 @@ use crate::class_loader::class_path::ClassPath;
 use crate::class_parser::parse_class_file;
 use crate::gc::global_definition::JObject;
 
-use crate::class_loader::register_class;
-use crate::java_const::JAVA_LANG_OBJECT;
+use crate::class_loader::{load_class, register_class};
+use crate::java_const::{JAVA_LANG_CLASS, JAVA_LANG_OBJECT};
 use crate::jthread::JvmThread;
 use tracing::debug;
 
@@ -19,10 +19,10 @@ impl BootstrapClassLoader {
         BootstrapClassLoader { class_path }
     }
 
-    pub fn load_class(&self, thread: &mut JvmThread, name: &str) -> Class {
+    pub fn load_class(&self, name: &str) -> Class {
         debug!(%name, "load_class");
         let name_bytes = name.as_bytes();
-        let class: Class = match name_bytes {
+        match name_bytes {
             [b'[', .., b'L'] => unimplemented!(),
             [b'[', _ty, ..] => unimplemented!(),
             [b'L', name_slice @ .., b';'] | name_slice => {
@@ -31,14 +31,12 @@ impl BootstrapClassLoader {
                     .class_path
                     .read_class(name)
                     .unwrap_or_else(|_| panic!("read class file: {}", name));
-                self.define_class(thread, name.to_string(), data).into()
+                self.define_class(name.to_string(), data).into()
             }
-        };
-        let _class_id = register_class(thread, class.clone(), JObject::null());
-        class
+        }
     }
 
-    fn define_class(&self, thread: &mut JvmThread, name: String, data: Vec<u8>) -> InstanceClass {
+    fn define_class(&self, name: String, data: Vec<u8>) -> InstanceClass {
         debug!(%name, data_len = data.len(), "define_class");
         let loader = JObject::null();
         let (_, class_file) = parse_class_file(&data).expect("parse class");
@@ -49,29 +47,15 @@ impl BootstrapClassLoader {
             let super_class_name = class_file
                 .constant_pool
                 .get_class_name_at(super_class_index);
-            Some(self.load_class(thread, super_class_name))
+            Some(load_class(JObject::null(), super_class_name))
         };
 
         let mut interfaces = Vec::with_capacity(class_file.interfaces.len());
         for interface_index in &class_file.interfaces {
             let interface_name = class_file.constant_pool.get_class_name_at(*interface_index);
-            interfaces.push(self.load_class(thread, interface_name));
+            interfaces.push(load_class(JObject::null(), interface_name));
         }
 
-        let mirror_class_oop = if name != JAVA_LANG_OBJECT {
-            let mirror_class = InstanceMirrorClass::new(&name, thread, loader);
-            alloc_jobject(&mirror_class.into())
-        } else {
-            JObject::null()
-        };
-
-        InstanceClass::new(
-            name,
-            class_file,
-            super_class,
-            interfaces,
-            mirror_class_oop,
-            loader,
-        )
+        InstanceClass::new(name, class_file, super_class, interfaces, loader)
     }
 }

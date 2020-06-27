@@ -47,12 +47,12 @@ impl Jvm {
 
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
-            let system_class = load_class(&mut thread, JObject::null(), "java/lang/System");
+            let system_class = load_class(JObject::null(), "java/lang/System");
             let system_class_initialize = system_class
                 .get_method("initializeSystemClass", "()V", true)
                 .expect("system init");
 
-            execute_method(&mut thread, system_class_initialize, vec![]);
+            execute_class_method(&mut thread, system_class, system_class_initialize, vec![]);
         });
         jvm
     }
@@ -60,19 +60,30 @@ impl Jvm {
     pub fn run(&mut self) {
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
-            let class = load_class(&mut thread, JObject::null(), &self.main_class);
+            let class = load_class(JObject::null(), &self.main_class);
             let main_method = class
                 .get_method("main", "([Ljava/lang/String;)V", true)
                 .unwrap();
 
-            execute_method(&mut thread, main_method, vec![]);
+            execute_class_method(&mut thread, class, main_method, vec![]);
         });
     }
 }
 
 pub fn execute_method(thread: &mut JvmThread, method: Method, args: Vec<JValue>) {
+    let class = load_class(method.class_loader(), method.class_name());
+    execute_class_method(thread, class, method, args)
+}
+
+pub fn execute_class_method(
+    thread: &mut JvmThread,
+    class: Class,
+    method: Method,
+    args: Vec<JValue>,
+) {
+    assert_eq!(class.name(), method.class_name());
+
     let is_native = method.is_native();
-    let class = load_class(thread, method.class_loader(), method.class_name());
 
     let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();

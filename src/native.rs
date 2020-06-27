@@ -14,7 +14,7 @@ pub fn java_lang_Class_getPrimitiveClass(
 ) {
     let string_ref = args.pop().unwrap();
     let class_name = get_java_string(thread, string_ref.as_jobject());
-    let primitive_class = load_class(thread, class.class_loader(), &class_name);
+    let primitive_class = load_class(class.class_loader(), &class_name);
     let frame = thread.current_frame_mut();
     frame
         .operand_stack
@@ -190,7 +190,7 @@ pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Ve
     let name = get_java_string(thread, args[0].as_jobject());
     let class_name = name.replace('.', "/");
     eprintln!("class_for_Name0: {}", &class_name);
-    let class = load_class(thread, class.class_loader(), &class_name);
+    let class = load_class(class.class_loader(), &class_name);
     thread
         .current_frame_mut()
         .operand_stack

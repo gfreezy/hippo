@@ -16,11 +16,7 @@ pub fn new_jobject(class: Class) -> JObject {
 }
 
 pub fn new_jtype_array(thread: &mut JvmThread, basic_ty: BasicType, len: usize) -> JArray {
-    let class = load_class(
-        thread,
-        JObject::null(),
-        &format!("[{}", basic_ty.descriptor()),
-    );
+    let class = load_class(JObject::null(), &format!("[{}", basic_ty.descriptor()));
     let class_id = get_class_id_by_name(class.name());
     alloc_jarray(basic_ty, class_id, len)
 }
@@ -35,7 +31,7 @@ pub fn new_java_lang_string(thread: &mut JvmThread, s: &str) -> JObject {
     let array = new_jtype_array(thread, BasicType::Char, bytes_str.len());
     array.copy_from(&bytes_str);
 
-    let class = load_class(thread, JObject::null(), JAVA_LANG_STRING);
+    let class = load_class(JObject::null(), JAVA_LANG_STRING);
     let obj = alloc_jobject(&class);
     let f = class.get_field("value", "[C").unwrap();
     obj.set_field_by_offset(f.offset(), array);
@@ -43,7 +39,7 @@ pub fn new_java_lang_string(thread: &mut JvmThread, s: &str) -> JObject {
 }
 
 pub fn get_java_string(thread: &mut JvmThread, obj: JObject) -> String {
-    let class = load_class(thread, JObject::null(), JAVA_LANG_STRING);
+    let class = load_class(JObject::null(), JAVA_LANG_STRING);
     let f = class.get_field("value", "[C").unwrap();
     let chars_ref = obj.get_field_by_offset::<JArray>(f.offset());
     let bytes: Vec<u16> = chars_ref.as_slice().to_vec();
@@ -54,8 +50,8 @@ pub fn did_override_method(thread: &mut JvmThread, method: &Method, other: &Meth
     if method == other {
         return true;
     }
-    let this_class = load_class(thread, method.class_loader(), method.class_name());
-    let other_class = load_class(thread, method.class_loader(), other.name());
+    let this_class = load_class(method.class_loader(), method.class_name());
+    let other_class = load_class(method.class_loader(), other.name());
     if !this_class.is_subclass_of(other_class) {
         return false;
     }

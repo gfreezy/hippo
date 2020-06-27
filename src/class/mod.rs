@@ -69,7 +69,13 @@ impl Class {
     }
 
     pub fn instance_size(&self) -> usize {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.instance_size(),
+            Class::InstanceClassLoaderClass(c) => c.instance_size(),
+            Class::InstanceMirrorClass(c) => c.instance_size(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn set_ty(&self, _ty: ClassType) {
@@ -109,11 +115,23 @@ impl Class {
     }
 
     pub fn class_loader(&self) -> JObject {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.class_loader(),
+            Class::InstanceClassLoaderClass(c) => c.class_loader(),
+            Class::InstanceMirrorClass(c) => c.class_loader(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
-    pub fn set_mirror_class(&self, _oop: Oop) {
-        unimplemented!()
+    pub fn set_mirror_class(&self, mirror: JObject) {
+        match self {
+            Class::InstanceClass(c) => c.set_mirror_class(mirror),
+            Class::InstanceClassLoaderClass(c) => c.set_mirror_class(mirror),
+            Class::InstanceMirrorClass(c) => c.set_mirror_class(mirror),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn set_instance_size(&self, _size: usize) {
@@ -125,7 +143,13 @@ impl Class {
     }
 
     pub fn constant_pool(&self) -> &ConstPool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.constant_pool(),
+            Class::InstanceClassLoaderClass(c) => c.constant_pool(),
+            Class::InstanceMirrorClass(c) => c.constant_pool(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn access_flags(&self) -> u16 {
@@ -153,7 +177,13 @@ impl Class {
     }
 
     pub fn name(&self) -> &str {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.name(),
+            Class::InstanceClassLoaderClass(c) => c.name(),
+            Class::InstanceMirrorClass(c) => c.name(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn iter_super_classes(&self) -> SuperClassesIter {
@@ -208,8 +238,14 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn get_method(&self, _name: &str, _descriptor: &str, _is_static: bool) -> Option<Method> {
-        unimplemented!()
+    pub fn get_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
+        match self {
+            Class::InstanceClass(c) => c.get_method(name, descriptor, is_static),
+            Class::InstanceClassLoaderClass(c) => c.get_method(name, descriptor, is_static),
+            Class::InstanceMirrorClass(c) => c.get_method(name, descriptor, is_static),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn get_static_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {

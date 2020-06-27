@@ -4,7 +4,7 @@ pub mod method;
 
 use crate::class::inner_class::field::descriptor_size_in_bytes;
 use crate::class::inner_class::method::Method;
-use crate::class::Class;
+use crate::class::{alloc_jobject, Class, InstanceMirrorClass};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
@@ -18,10 +18,11 @@ use crate::jenv::new_java_lang_string;
 use field::Field;
 use nom::lib::std::collections::HashMap;
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::java_const::JAVA_LANG_CLASS;
 use crate::jthread::JvmThread;
-use std::sync::atomic::Ordering::SeqCst;
+use crossbeam::atomic::AtomicCell;
 use tracing::trace;
 
 #[repr(C)]
@@ -34,11 +35,10 @@ pub struct InnerClass {
     static_fields: HashMap<String, Field>,
     instance_fields: HashMap<String, Field>,
     methods: Vec<Method>,
-    mirror_class: JObject,
+    mirror_class: AtomicCell<JObject>,
     instance_size: AtomicU64,
     static_size: usize,
     loader: JObject,
-    inited: AtomicBool,
 }
 
 impl InnerClass {
@@ -47,7 +47,6 @@ impl InnerClass {
         class_file: ClassFile,
         super_class: Option<Class>,
         interfaces: Vec<Class>,
-        mirror_class: JObject,
         loader: JObject,
     ) -> Self {
         let ClassFile {
@@ -117,17 +116,29 @@ impl InnerClass {
             static_fields,
             methods,
             interfaces,
-            mirror_class,
+            mirror_class: AtomicCell::new(JObject::null()),
             instance_size: AtomicU64::new(instance_offset as u64),
             static_size: static_offset,
             loader,
-            inited: AtomicBool::new(false),
         };
         inner_class
     }
 
     pub fn mirror_class(&self) -> JObject {
-        self.mirror_class
+        if self.name() != JAVA_LANG_CLASS {
+            JObject::null()
+        } else if self.mirror_class.load().is_null() {
+            let mirror_class = InstanceMirrorClass::new(self.name(), self.loader);
+            let mirror = alloc_jobject(&mirror_class.into());
+            self.mirror_class.store(mirror);
+            mirror
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn set_mirror_class(&self, mirror: JObject) {
+        self.mirror_class.store(mirror);
     }
 
     pub fn instance_size(&self) -> usize {
