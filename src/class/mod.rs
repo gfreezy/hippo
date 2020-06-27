@@ -66,7 +66,13 @@ impl Class {
     }
 
     pub fn mirror_class(&self) -> JObject {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.mirror_class(),
+            Class::InstanceClassLoaderClass(c) => c.mirror_class(),
+            Class::InstanceMirrorClass(c) => c.mirror_class(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn instance_size(&self) -> usize {
@@ -249,12 +255,24 @@ impl Class {
         }
     }
 
-    pub fn get_static_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
-        unimplemented!()
+    pub fn get_static_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+        match self {
+            Class::InstanceClass(c) => c.get_static_field(name, descriptor),
+            Class::InstanceClassLoaderClass(c) => c.get_static_field(name, descriptor),
+            Class::InstanceMirrorClass(c) => c.get_static_field(name, descriptor),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
-    pub fn get_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
-        unimplemented!()
+    pub fn get_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+        match self {
+            Class::InstanceClass(c) => c.get_field(name, descriptor),
+            Class::InstanceClassLoaderClass(c) => c.get_field(name, descriptor),
+            Class::InstanceMirrorClass(c) => c.get_field(name, descriptor),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_subclass_of(&self, _class: Class) -> bool {

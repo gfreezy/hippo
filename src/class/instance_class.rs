@@ -104,6 +104,10 @@ macro_rules! impl_instance_class {
                 self.class.set_mirror_class(mirror);
             }
 
+            pub fn mirror_class(&self) -> crate::gc::global_definition::JObject {
+                self.class.mirror_class()
+            }
+
             pub fn did_implement_interface(&self, interface: crate::class::Class) -> bool {
                 self.class.did_implement_interface(interface)
             }

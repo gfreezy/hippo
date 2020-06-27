@@ -5,11 +5,15 @@ use crate::class_loader::{load_class, BOOTSTRAP_LOADER};
 use crate::frame::JvmFrame;
 use crate::gc::global_definition::{JObject, JValue};
 
+use crate::gc::allocator_local::AllocatorLocal;
+use crate::gc::space::Space;
+use crate::gc::tlab::{initialize_tlab, ALLOCATOR_LOCAL};
 use crate::instruction::opcode::show_opcode;
 use crate::instruction::*;
 use crate::jenv::JTHREAD;
 use crate::jthread::JvmThread;
 use crate::native::*;
+use std::sync::Arc;
 use tracing::debug;
 
 #[derive(Debug)]
@@ -44,6 +48,7 @@ impl Jvm {
             main_class: class_name.to_string(),
         };
         BOOTSTRAP_LOADER.set(BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)));
+        initialize_tlab(AllocatorLocal::new(Arc::new(Space::new(1024 * 1024 * 100))));
 
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();

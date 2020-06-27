@@ -62,7 +62,9 @@ impl Space {
 impl Drop for Space {
     fn drop(&mut self) {
         let size = self.end.diff(self.start);
-        unsafe { os::munmap(self.start.as_ptr(), size) }
+        if size > 0 {
+            unsafe { os::munmap(self.start.as_ptr(), size) }
+        }
     }
 }
 
