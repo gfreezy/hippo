@@ -1,8 +1,9 @@
-use crate::class::{Class, InnerClass};
+use crate::class::{Class, InstanceClass};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct InstanceClassLoaderClass {
-    class: InnerClass,
+    class: InstanceClass,
 }
 
 impl_instance_class!(InstanceClassLoaderClass);
@@ -15,6 +16,6 @@ impl InstanceClassLoaderClass {
 
 impl From<InstanceClassLoaderClass> for Class {
     fn from(cls: InstanceClassLoaderClass) -> Class {
-        Class::InstanceClassLoaderClass(Arc::new(cls))
+        Class::InstanceClassLoaderClass(cls)
     }
 }

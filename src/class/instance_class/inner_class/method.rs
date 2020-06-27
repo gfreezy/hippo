@@ -1,4 +1,4 @@
-use crate::class::inner_class::cp_cache::CpCache;
+use super::cp_cache::CpCache;
 use crate::class::Class;
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::descriptor::method_descriptor;

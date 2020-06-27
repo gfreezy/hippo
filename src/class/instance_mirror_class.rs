@@ -1,4 +1,4 @@
-use crate::class::{Class, InnerClass};
+use crate::class::{Class, InstanceClass};
 use crate::class_loader::load_class;
 use crate::gc::global_definition::JObject;
 use crate::gc::mem::align_usize;
@@ -7,8 +7,9 @@ use crate::java_const::JAVA_LANG_CLASS;
 use crate::jthread::JvmThread;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct InstanceMirrorClass {
-    class: InnerClass,
+    class: InstanceClass,
     base_static_offset: usize,
     class_name: String,
 }
@@ -24,7 +25,7 @@ impl InstanceMirrorClass {
         let offset = align_usize(self_instance_size, 8);
         class.set_instance_size(offset + java_class_static_size);
         InstanceMirrorClass {
-            class: class.inner(),
+            class: class.as_instance_class(),
             base_static_offset: offset,
             class_name: name.to_string(),
         }
@@ -41,6 +42,6 @@ impl InstanceMirrorClass {
 
 impl From<InstanceMirrorClass> for Class {
     fn from(cls: InstanceMirrorClass) -> Class {
-        Class::InstanceMirrorClass(Arc::new(cls))
+        Class::InstanceMirrorClass(cls)
     }
 }

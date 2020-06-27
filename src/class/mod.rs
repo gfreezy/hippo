@@ -1,15 +1,13 @@
-mod inner_class;
 #[macro_use]
 mod instance_class;
 mod array_class;
 mod instance_class_loader_class;
 mod instance_mirror_class;
 
-pub use self::inner_class::field::Field;
-pub use self::inner_class::method::Method;
-pub use self::inner_class::InnerClass;
-pub use self::inner_class::SuperClassesIter;
+pub use self::instance_class::Field;
 pub use self::instance_class::InstanceClass;
+pub use self::instance_class::Method;
+pub use self::instance_class::SuperClassesIter;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
 pub use self::instance_mirror_class::InstanceMirrorClass;
 use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
@@ -30,11 +28,11 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum Class {
-    InstanceClass(Arc<InstanceClass>),
-    InstanceClassLoaderClass(Arc<InstanceClassLoaderClass>),
-    InstanceMirrorClass(Arc<InstanceMirrorClass>),
-    TypeArrayClass(Arc<TypeArrayClass>),
-    ObjArrayClass(Arc<ObjArrayClass>),
+    InstanceClass(InstanceClass),
+    InstanceClassLoaderClass(InstanceClassLoaderClass),
+    InstanceMirrorClass(InstanceMirrorClass),
+    TypeArrayClass(TypeArrayClass),
+    ObjArrayClass(ObjArrayClass),
 }
 
 impl fmt::Display for Class {
@@ -56,8 +54,11 @@ impl fmt::Debug for Class {
 }
 
 impl Class {
-    pub fn inner(&self) -> InnerClass {
-        unimplemented!()
+    pub fn as_instance_class(&self) -> InstanceClass {
+        match self {
+            Class::InstanceClass(c) => c.clone(),
+            _ => unreachable!(),
+        }
     }
 
     pub fn ty(&self) -> ClassType {
@@ -260,7 +261,7 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn as_instance_mirror_class(&self) -> Arc<InstanceMirrorClass> {
+    pub fn as_instance_mirror_class(&self) -> InstanceMirrorClass {
         match self {
             Class::InstanceMirrorClass(c) => c.clone(),
             _ => unreachable!(),

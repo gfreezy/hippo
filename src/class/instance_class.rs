@@ -1,12 +1,18 @@
-use crate::class::{Class, InnerClass};
+mod inner_class;
+
+use crate::class::Class;
 use crate::class_parser::ClassFile;
 use crate::gc::global_definition::JObject;
+pub use inner_class::field::Field;
+pub use inner_class::method::Method;
+use inner_class::InnerClass;
+pub use inner_class::SuperClassesIter;
 
 use std::sync::Arc;
 
-#[repr(C)]
+#[derive(Clone)]
 pub struct InstanceClass {
-    class: InnerClass,
+    class: Arc<InnerClass>,
 }
 
 macro_rules! impl_instance_class {
@@ -171,7 +177,13 @@ impl InstanceClass {
         loader: JObject,
     ) -> Self {
         InstanceClass {
-            class: InnerClass::new(name, class_file, super_class, interfaces, loader),
+            class: Arc::new(InnerClass::new(
+                name,
+                class_file,
+                super_class,
+                interfaces,
+                loader,
+            )),
         }
     }
     pub fn instance_size(&self) -> usize {
@@ -181,7 +193,7 @@ impl InstanceClass {
 
 impl From<InstanceClass> for Class {
     fn from(cls: InstanceClass) -> Class {
-        Class::InstanceClass(Arc::new(cls))
+        Class::InstanceClass(cls)
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::class::inner_class::method::Method;
+use super::method::Method;
 use crate::class::Class;
 
 #[derive(Debug)]

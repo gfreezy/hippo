@@ -478,10 +478,10 @@ fn can_cast_to(thread: &mut JvmThread, s: Class, t: Class) -> bool {
         }
         (s, Class::InstanceClass(t)) if t.is_class() => t.name() == JAVA_LANG_OBJECT,
         (s, Class::InstanceClass(t)) if t.is_interface() => unimplemented!(),
-        (Class::TypeArrayClass(s), Class::TypeArrayClass(t)) => s.ty == t.ty,
+        (Class::TypeArrayClass(s), Class::TypeArrayClass(t)) => s.ty() == t.ty(),
         (Class::ObjArrayClass(s), Class::ObjArrayClass(t)) => {
-            let sc = s.element_class.clone();
-            let tc = t.element_class.clone();
+            let sc = s.element_class();
+            let tc = t.element_class();
             can_cast_to(thread, sc, tc)
         }
         _ => false,

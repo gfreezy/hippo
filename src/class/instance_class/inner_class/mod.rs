@@ -2,8 +2,6 @@ pub mod cp_cache;
 pub mod field;
 pub mod method;
 
-use crate::class::inner_class::field::descriptor_size_in_bytes;
-use crate::class::inner_class::method::Method;
 use crate::class::{alloc_jobject, Class, InstanceMirrorClass};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
@@ -13,6 +11,8 @@ use crate::class_parser::{
 };
 use crate::gc::global_definition::{JObject, JValue};
 use crate::gc::mem::align_usize;
+use field::descriptor_size_in_bytes;
+use method::Method;
 
 use crate::jenv::new_java_lang_string;
 use field::Field;
