@@ -50,6 +50,14 @@ macro_rules! impl_instance_class {
                 self.class.is_final()
             }
 
+            pub fn is_inited(&self) -> bool {
+                self.class.is_inited()
+            }
+
+            pub fn set_inited(&self) {
+                self.class.set_inited()
+            }
+
             pub fn class_loader(&self) -> crate::gc::global_definition::JObject {
                 self.class.class_loader()
             }
@@ -140,6 +148,22 @@ macro_rules! impl_instance_class {
                 descriptor: &str,
             ) -> Option<crate::class::Method> {
                 self.class.get_interface_method(name, descriptor)
+            }
+
+            pub fn get_interface_field(
+                &self,
+                name: &str,
+                descriptor: &str,
+            ) -> Option<crate::class::Field> {
+                self.class.get_interface_field(name, descriptor)
+            }
+
+            pub fn get_self_field(
+                &self,
+                name: &str,
+                descriptor: &str,
+            ) -> Option<crate::class::Field> {
+                self.class.get_self_field(name, descriptor)
             }
 
             pub fn get_method(

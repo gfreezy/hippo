@@ -1,24 +1,34 @@
 #![allow(non_snake_case, unused_variables)]
 
-use crate::class::Class;
+use crate::class::{alloc_empty_jobject, alloc_jobject, Class};
 use crate::class_loader::{get_class_by_id, load_class};
 use crate::gc::global_definition::{JObject, JValue};
 use crate::jenv::{get_java_string, new_java_lang_string};
 use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
+use once_cell::sync::OnceCell;
+use std::collections::HashMap;
 
 pub fn java_lang_Class_getPrimitiveClass(
     thread: &mut JvmThread,
     class: &Class,
     mut args: Vec<JValue>,
 ) {
+    static PRIMITIVE_CLASSES: OnceCell<HashMap<String, JObject>> = OnceCell::new();
+    let primitive_classes = PRIMITIVE_CLASSES.get_or_init(|| {
+        let mut map = HashMap::new();
+        map.insert("float".to_string(), alloc_empty_jobject());
+        map.insert("int".to_string(), alloc_empty_jobject());
+        map.insert("double".to_string(), alloc_empty_jobject());
+        map.insert("short".to_string(), alloc_empty_jobject());
+        map.insert("byte".to_string(), alloc_empty_jobject());
+        map
+    });
     let string_ref = args.pop().unwrap();
-    let class_name = get_java_string(thread, string_ref.as_jobject());
-    let primitive_class = load_class(class.class_loader(), &class_name);
+    let class_name = get_java_string(string_ref.as_jobject());
+    let primitive_class = primitive_classes.get(&class_name).unwrap();
     let frame = thread.current_frame_mut();
-    frame
-        .operand_stack
-        .push_jobject(primitive_class.mirror_class());
+    frame.operand_stack.push_jobject(primitive_class.clone());
 }
 
 pub fn jvm_desiredAssertionStatus0(thread: &mut JvmThread, _class: &Class, _args: Vec<JValue>) {
@@ -88,8 +98,8 @@ pub fn java_lang_System_initProperties(thread: &mut JvmThread, _class: &Class, a
         ("user.dir", "/Users/feichao"),
     ];
     for (key, value) in systemProperties {
-        let key = JValue::Object(new_java_lang_string(thread, key));
-        let value = JValue::Object(new_java_lang_string(thread, value));
+        let key = JValue::Object(new_java_lang_string(key));
+        let value = JValue::Object(new_java_lang_string(value));
         let args = vec![props_ref.clone(), key, value];
         execute_method(thread, method.clone(), args);
     }
@@ -179,15 +189,12 @@ pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, arg
 }
 
 pub fn java_lang_Class_getName0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let addr = new_java_lang_string(
-        thread,
-        class.as_instance_mirror_class().mirrored_class_name(),
-    );
+    let addr = new_java_lang_string(class.as_instance_mirror_class().mirrored_class_name());
     thread.current_frame_mut().operand_stack.push_jobject(addr);
 }
 
 pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let name = get_java_string(thread, args[0].as_jobject());
+    let name = get_java_string(args[0].as_jobject());
     let class_name = name.replace('.', "/");
     eprintln!("class_for_Name0: {}", &class_name);
     let class = load_class(class.class_loader(), &class_name);
@@ -215,6 +222,6 @@ pub fn java_lang_Thread_setPriority0(thread: &mut JvmThread, class: &Class, args
         let class_id = object_ref.class_id();
         let class = get_class_by_id(class_id);
         let field = class.get_field("priority", "I").unwrap();
-        object_ref.set_field_by_offset(field.offset(), JValue::Int(5));
+        object_ref.set_field_by_offset(field.offset(), 5);
     }
 }

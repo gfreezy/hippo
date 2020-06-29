@@ -1,4 +1,5 @@
 use crate::gc::os;
+use std::mem;
 use std::mem::size_of;
 
 #[inline(always)]
@@ -96,6 +97,14 @@ pub fn fits_u8(value: i64) -> bool {
 /// returns true if value fits into i32 (signed 32bits).
 pub fn fits_i32(value: i64) -> bool {
     i32::MIN as i64 <= value && value <= i32::MAX as i64
+}
+
+pub fn view_memory<T>(p: *const T, bytes: usize) {
+    let view = p as *const u8;
+    for i in 0..bytes {
+        print!("{:02x} ", unsafe { view.offset(i as isize).read() });
+    }
+    println!();
 }
 
 #[cfg(test)]

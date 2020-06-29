@@ -3,12 +3,12 @@ use crate::gc::address::Address;
 use crate::gc::global_definition::type_to_basic_type::{
     size_of_java_type, type_to_basic_type, TypeToBasicType,
 };
-use crate::gc::global_definition::{BasicType, HEAP_WORD_SIZE};
+use crate::gc::global_definition::{BasicType, JArray, JObject, HEAP_WORD_SIZE};
 use crate::gc::mark_word::MarkWord;
-use crate::gc::mem::align_usize;
-use field_offset::__memoffset::mem::transmute;
+use crate::gc::mem::{align_usize, is_aligned, view_memory};
 
-use std::mem::size_of;
+use std::any::type_name;
+use std::mem::{size_of, transmute};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 #[repr(C)]
@@ -80,7 +80,9 @@ impl InstanceOopDesc {
         let base_offset = Self::base_offset_in_bytes();
         unsafe {
             let self_offset: *mut T = transmute(self);
-            let field_offset = self_offset.offset((base_offset + offset) as isize);
+            let relative_offset = base_offset + offset;
+            assert!(is_aligned(relative_offset, size_of::<T>()));
+            let field_offset = self_offset.offset((relative_offset / size_of::<T>()) as isize);
             field_offset.write(value)
         }
     }
@@ -92,7 +94,9 @@ impl InstanceOopDesc {
         let base_offset = Self::base_offset_in_bytes();
         unsafe {
             let self_offset: *const T = transmute(self);
-            let field_offset = self_offset.offset((base_offset + offset) as isize);
+            let relative_offset = base_offset + offset;
+            assert!(is_aligned(relative_offset, size_of::<T>()));
+            let field_offset = self_offset.offset((relative_offset / size_of::<T>()) as isize);
             field_offset.read()
         }
     }
@@ -127,7 +131,8 @@ impl ArrayOopDesc {
         let length_offset = ArrayOopDesc::length_offset_in_bytes();
         unsafe {
             let self_offset: *const usize = transmute(self);
-            let len_pointer = self_offset.offset(length_offset as isize);
+            assert!(is_aligned(length_offset, size_of::<usize>()));
+            let len_pointer = self_offset.offset((length_offset / size_of::<usize>()) as isize);
             len_pointer.read()
         }
     }
@@ -136,7 +141,8 @@ impl ArrayOopDesc {
         let length_offset = ArrayOopDesc::length_offset_in_bytes();
         unsafe {
             let self_offset: *mut usize = transmute(self);
-            let len_pointer = self_offset.offset(length_offset as isize);
+            assert!(is_aligned(length_offset, size_of::<usize>()));
+            let len_pointer = self_offset.offset((length_offset / size_of::<usize>()) as isize);
             len_pointer.write(len)
         }
     }
@@ -146,11 +152,12 @@ impl ArrayOopDesc {
         TypeToBasicType<T>: Into<BasicType>,
     {
         let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
-        let data_pointer = unsafe {
+        unsafe {
             let self_offset: *const T = transmute(self);
-            self_offset.offset(data_offset as isize)
-        };
-        unsafe { std::slice::from_raw_parts(data_pointer, self.len()) }
+            assert!(is_aligned(data_offset, size_of::<T>()));
+            let data_pointer = self_offset.offset((data_offset / size_of::<T>()) as isize);
+            unsafe { std::slice::from_raw_parts(data_pointer, self.len()) }
+        }
     }
 
     pub fn as_mut_slice<T>(&self) -> &mut [T]
@@ -160,7 +167,8 @@ impl ArrayOopDesc {
         let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
         unsafe {
             let self_offset: *mut T = transmute(self);
-            let data_pointer = self_offset.offset(data_offset as isize);
+            assert!(is_aligned(data_offset, size_of::<T>()));
+            let data_pointer = self_offset.offset((data_offset / size_of::<T>()) as isize);
             std::slice::from_raw_parts_mut(data_pointer, self.len())
         }
     }
@@ -171,10 +179,12 @@ impl ArrayOopDesc {
     {
         assert_eq!(src.len(), self.len());
         let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
+        assert!(is_aligned(data_offset, size_of::<T>()));
+
         unsafe {
             let self_offset: *mut T = transmute(self);
-            let data_pointer = self_offset.offset(data_offset as isize);
-            std::ptr::copy_nonoverlapping(src.as_ptr(), data_pointer, self.len())
+            let data_pointer = self_offset.offset((data_offset / size_of::<T>()) as isize);
+            std::ptr::copy_nonoverlapping(src.as_ptr(), data_pointer, self.len());
         }
     }
 
@@ -185,8 +195,9 @@ impl ArrayOopDesc {
         let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
         unsafe {
             let self_offset: *const T = transmute(self);
-            let el_pointer =
-                self_offset.offset((data_offset + size_of_java_type::<T>(None) * index) as isize);
+            let offset = data_offset + size_of_java_type::<T>(None) * index;
+            assert!(is_aligned(offset, size_of::<T>()));
+            let el_pointer = self_offset.offset((offset / size_of::<T>()) as isize);
             el_pointer.read()
         }
     }
@@ -198,8 +209,9 @@ impl ArrayOopDesc {
         let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
         unsafe {
             let self_offset: *mut T = transmute(self);
-            let el_pointer =
-                self_offset.offset((data_offset + size_of_java_type::<T>(None) * index) as isize);
+            let offset = data_offset + size_of_java_type::<T>(None) * index;
+            assert!(is_aligned(offset, size_of::<T>()));
+            let el_pointer = self_offset.offset((offset / size_of::<T>()) as isize);
             el_pointer.write(val)
         }
     }

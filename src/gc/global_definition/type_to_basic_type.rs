@@ -44,6 +44,7 @@ impl From<TypeToBasicType<JShort>> for BasicType {
         BasicType::Short
     }
 }
+
 impl From<TypeToBasicType<JInt>> for BasicType {
     fn from(_: TypeToBasicType<JInt>) -> Self {
         BasicType::Int
@@ -79,21 +80,21 @@ impl From<TypeToBasicType<JArray>> for BasicType {
         BasicType::Array
     }
 }
-
-impl From<TypeToBasicType<JValue>> for BasicType {
-    fn from(v: TypeToBasicType<JValue>) -> Self {
-        match v.v {
-            Some(JValue::Boolean(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Char(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Float(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Double(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Byte(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Short(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Int(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Long(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Object(inner)) => type_to_basic_type(Some(inner)),
-            Some(JValue::Array(inner)) => type_to_basic_type(Some(inner)),
-            None => unreachable!(),
-        }
-    }
-}
+//
+// impl From<TypeToBasicType<JValue>> for BasicType {
+//     fn from(v: TypeToBasicType<JValue>) -> Self {
+//         match v.v {
+//             Some(JValue::Boolean(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Char(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Float(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Double(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Byte(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Short(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Int(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Long(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Object(inner)) => type_to_basic_type(Some(inner)),
+//             Some(JValue::Array(inner)) => type_to_basic_type(Some(inner)),
+//             None => unreachable!(),
+//         }
+//     }
+// }

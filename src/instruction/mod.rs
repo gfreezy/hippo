@@ -3,7 +3,7 @@
 pub mod opcode;
 
 use crate::class::Class;
-use crate::class_loader::{get_class_by_id, load_class};
+use crate::class_loader::{get_class_by_id, init_class, load_class};
 use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::gc::global_definition::{JObject, JValue};
 
@@ -45,13 +45,14 @@ pub fn ldc(thread: &mut JvmThread, class: &Class) {
         }
         ConstPoolInfo::ConstantStringInfo { string_index } => {
             let s = class.constant_pool().get_utf8_string_at(*string_index);
-            let str_ref = new_java_lang_string(thread, s);
+            let str_ref = new_java_lang_string(s);
             let frame = thread.current_frame_mut();
             frame.operand_stack.push_jobject(str_ref)
         }
         ConstPoolInfo::ConstantClassInfo { name_index } => {
             let name = class.constant_pool().get_utf8_string_at(*name_index);
             let class = load_class(class.class_loader(), name);
+            init_class(thread, &class);
             let frame = thread.current_frame_mut();
             frame.operand_stack.push_jobject(class.mirror_class());
         }
@@ -91,7 +92,7 @@ pub fn astore(thread: &mut JvmThread, class: &Class) {
 
 pub fn aastore(thread: &mut JvmThread, class: &Class) {
     let frame = thread.current_frame_mut();
-    let val = frame.operand_stack.pop();
+    let val = frame.operand_stack.pop_jobject();
     let index = frame.operand_stack.pop_jint();
     let array_ref = frame.operand_stack.pop_jarray();
     array_ref.set(index as usize, val);
@@ -157,7 +158,9 @@ pub fn aaload(thread: &mut JvmThread, class: &Class) {
     let frame = thread.current_frame_mut();
     let index = frame.operand_stack.pop_jint();
     let array_ref = frame.operand_stack.pop_jarray();
-    frame.operand_stack.push(array_ref.get(index as usize));
+    frame
+        .operand_stack
+        .push_jobject(array_ref.get::<JObject>(index as usize));
 }
 
 pub fn caload(thread: &mut JvmThread, class: &Class) {
@@ -203,6 +206,7 @@ pub fn invokestatic(thread: &mut JvmThread, class: &Class) {
 
     let class_name = method_ref.class_name;
     let class = load_class(class.class_loader(), class_name);
+    init_class(thread, &class);
     let method = class
         .get_method(method_ref.method_name, method_ref.descriptor, true)
         .expect("get method");
@@ -258,25 +262,28 @@ pub fn getstatic(thread: &mut JvmThread, class: &Class) {
     let opcode_pc = frame.pc() - 1;
     let index = frame.read_u16().unwrap();
     let method = frame.method();
-    let (field_class, field_offset) = if let Some(v) = method.resolve_static_field(opcode_pc) {
-        v
-    } else {
-        let field_ref = class.constant_pool().get_field_ref_at(index);
-        let field_class = load_class(class.class_loader(), field_ref.class_name);
-        let field = field_class
-            .get_static_field(field_ref.field_name, field_ref.descriptor)
-            .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
-        let field_offset = field.offset();
-        method.set_static_field(opcode_pc, field_class.clone(), field_offset);
+    let (field_class, basic_type, field_offset) =
+        if let Some(v) = method.resolve_static_field(opcode_pc) {
+            v
+        } else {
+            let field_ref = class.constant_pool().get_field_ref_at(index);
+            let field_class = load_class(class.class_loader(), field_ref.class_name);
+            init_class(thread, &field_class);
+            let field = field_class
+                .get_static_field(field_ref.field_name, field_ref.descriptor)
+                .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
+            let field_offset = field.offset();
+            let basic_type = field.basic_type();
+            method.set_static_field(opcode_pc, field_class.clone(), basic_type, field_offset);
 
-        (field_class, field_offset)
-    };
+            (field_class, basic_type, field_offset)
+        };
 
     let mirror_class = field_class.mirror_class();
     let frame = thread.current_frame_mut();
     frame
         .operand_stack
-        .push(mirror_class.get_field_by_offset(field_offset))
+        .push(mirror_class.get_field_by_basic_type_and_offset(basic_type, field_offset))
 }
 
 pub fn putstatic(thread: &mut JvmThread, class: &Class) {
@@ -285,22 +292,25 @@ pub fn putstatic(thread: &mut JvmThread, class: &Class) {
     let index = frame.read_u16().unwrap();
     let value = frame.operand_stack.pop();
     let method = frame.method();
-    let (field_class, field_offset) = if let Some(v) = method.resolve_static_field(opcode_pc) {
-        v
-    } else {
-        let field_ref = class.constant_pool().get_field_ref_at(index);
-        let field_class = load_class(class.class_loader(), field_ref.class_name);
-        let field = field_class
-            .get_static_field(field_ref.field_name, field_ref.descriptor)
-            .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
-        let field_offset = field.offset();
-        debug!(?field_ref, %field_offset, ?class, field=?value, "putstatic");
-        method.set_static_field(opcode_pc, field_class.clone(), field_offset);
-        (field_class, field_offset)
-    };
+    let (field_class, basic_type, field_offset) =
+        if let Some(v) = method.resolve_static_field(opcode_pc) {
+            v
+        } else {
+            let field_ref = class.constant_pool().get_field_ref_at(index);
+            let field_class = load_class(class.class_loader(), field_ref.class_name);
+            init_class(thread, &field_class);
+            let field = field_class
+                .get_static_field(field_ref.field_name, field_ref.descriptor)
+                .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
+            let field_offset = field.offset();
+            debug!(?field_ref, %field_offset, ?class, field=?value, "putstatic");
+            let basic_type = field.basic_type();
+            method.set_static_field(opcode_pc, field_class.clone(), basic_type, field_offset);
+            (field_class, basic_type, field_offset)
+        };
 
     let mirror_class = field_class.mirror_class();
-    mirror_class.set_field_by_offset(field_offset, value);
+    mirror_class.set_field_by_jvalue_and_offset(field_offset, value);
 }
 
 pub fn aconst_null(thread: &mut JvmThread, class: &Class) {
@@ -314,6 +324,7 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
     let method_ref = class.constant_pool().get_method_ref_at(index);
     debug!(?method_ref, "invokevirtual");
     let resolved_class = load_class(class.class_loader(), method_ref.class_name);
+    init_class(thread, &resolved_class);
     let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
         .unwrap_or_else(|| panic!("get method: {}", &method_ref.method_name));
@@ -342,7 +353,7 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
     let acutal_method = if !resolved_method.is_signature_polymorphic() {
         if let Some(actual_method) = object_class
             .get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
-            .filter(|m| did_override_method(thread, m, &resolved_method))
+            .filter(|m| did_override_method(m, &resolved_method))
         {
             actual_method
         } else if let Some(actual_method) = object_class
@@ -350,7 +361,7 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
             .filter_map(|klass| {
                 klass.get_self_method(resolved_method.name(), resolved_method.descriptor(), false)
             })
-            .find(|m| did_override_method(thread, m, &resolved_method))
+            .find(|m| did_override_method(m, &resolved_method))
         {
             actual_method
         } else if let Some(actual_method) =
@@ -363,8 +374,6 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
     } else {
         unimplemented!("is_signature_polymorphic")
     };
-
-    let actual_class = load_class(class.class_loader(), acutal_method.class_name());
 
     execute_method(thread, acutal_method, args);
 }
@@ -379,6 +388,7 @@ pub fn invokeinterface(thread: &mut JvmThread, class: &Class) {
     let method_ref = class.constant_pool().get_interface_method_ref_at(index);
     debug!(?method_ref, "invokeinterface");
     let resolved_class = load_class(class.class_loader(), method_ref.class_name);
+    init_class(thread, &resolved_class);
     let resolved_method = resolved_class
         .get_interface_method(method_ref.method_name, method_ref.descriptor)
         .unwrap_or_else(|| panic!("get interface method: {}", &method_ref.method_name));
@@ -420,8 +430,6 @@ pub fn invokeinterface(thread: &mut JvmThread, class: &Class) {
         unreachable!("no method found")
     };
 
-    let actual_class = load_class(class.class_loader(), acutal_method.class_name());
-
     execute_method(thread, acutal_method, args);
 }
 
@@ -430,6 +438,7 @@ pub fn new(thread: &mut JvmThread, class: &Class) {
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = load_class(class.class_loader(), class_name);
+    init_class(thread, &class);
     let jobject = new_jobject(class);
     let frame = thread.current_frame_mut();
     frame.operand_stack.push_jobject(jobject)
@@ -438,7 +447,7 @@ pub fn new(thread: &mut JvmThread, class: &Class) {
 pub fn newarray(thread: &mut JvmThread, class: &Class) {
     let count = thread.pop_jint();
     let atype = thread.read_u8();
-    let array = new_jtype_array(thread, atype.into(), count as usize);
+    let array = new_jtype_array(atype.into(), count as usize);
     thread.push_jarray(array);
 }
 
@@ -447,6 +456,7 @@ pub fn anewarray(thread: &mut JvmThread, class: &Class) {
     let index = thread.read_u16();
     let resolved_class_name = class.constant_pool().get_class_name_at(index);
     let class = load_class(class.class_loader(), resolved_class_name);
+    init_class(thread, &class);
     let array_ref = new_jobject_array(class, count as usize);
     thread.push_jarray(array_ref);
 }
@@ -489,10 +499,10 @@ fn can_cast_to(thread: &mut JvmThread, s: Class, t: Class) -> bool {
 }
 
 pub fn checkcast(thread: &mut JvmThread, class: &Class) {
-    let frame = thread.current_frame_mut();
-    let index = frame.read_u16().unwrap();
+    let index = thread.read_u16();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = load_class(class.class_loader(), class_name);
+    init_class(thread, &class);
     let frame = thread.current_frame_mut();
     let obj_ref = frame.operand_stack.pop();
     if obj_ref.is_null() {
@@ -502,7 +512,7 @@ pub fn checkcast(thread: &mut JvmThread, class: &Class) {
     let class_id = obj_ref.class_id();
     let obj_class = get_class_by_id(class_id);
 
-    assert!(can_cast_to(thread, obj_class, class));
+    assert!(can_cast_to(thread, dbg!(obj_class), dbg!(class)));
 
     let frame = thread.current_frame_mut();
     frame.operand_stack.push(obj_ref);
@@ -540,7 +550,7 @@ pub fn invokespecial(thread: &mut JvmThread, class: &Class) {
         .get_class_method_or_interface_method_at(index);
 
     let resolved_class = load_class(class.class_loader(), method_ref.class_name);
-
+    init_class(thread, &resolved_class);
     let resolved_method = resolved_class
         .get_method(method_ref.method_name, method_ref.descriptor, false)
         .unwrap_or_else(|| {
@@ -598,7 +608,7 @@ pub fn putfield(thread: &mut JvmThread, class: &Class) {
     let object_ref = frame.operand_stack.pop_jobject();
 
     let method = frame.method();
-    let field_offset = if let Some(offset) = method.resolve_field(opcode_pc) {
+    let (ty, field_offset) = if let Some(offset) = method.resolve_field(opcode_pc) {
         offset
     } else {
         let field_ref = class.constant_pool().get_field_ref_at(index);
@@ -609,10 +619,11 @@ pub fn putfield(thread: &mut JvmThread, class: &Class) {
             .get_field(field_ref.field_name, field_ref.descriptor)
             .unwrap();
         let offset = class_field.offset();
-        method.set_field(opcode_pc, offset);
-        offset
+        let ty = class_field.basic_type();
+        method.set_field(opcode_pc, ty, offset);
+        (ty, offset)
     };
-    object_ref.set_field_by_offset(field_offset, value)
+    object_ref.set_field_by_jvalue_and_offset(field_offset, value)
 }
 
 pub fn getfield(thread: &mut JvmThread, class: &Class) {
@@ -622,7 +633,7 @@ pub fn getfield(thread: &mut JvmThread, class: &Class) {
     let object_ref = frame.operand_stack.pop_jobject();
 
     let method = frame.method();
-    let field_offset = if let Some(offset) = method.resolve_field(opcode_pc) {
+    let (ty, field_offset) = if let Some(offset) = method.resolve_field(opcode_pc) {
         offset
     } else {
         let field_ref = class.constant_pool().get_field_ref_at(index);
@@ -632,11 +643,12 @@ pub fn getfield(thread: &mut JvmThread, class: &Class) {
             .get_field(field_ref.field_name, field_ref.descriptor)
             .unwrap();
         let offset = class_field.offset();
+        let ty = class_field.basic_type();
         debug!(?object_ref, ?field_ref, offset, "getfield");
-        method.set_field(opcode_pc, offset);
-        offset
+        method.set_field(opcode_pc, ty, offset);
+        (ty, offset)
     };
-    let value = object_ref.get_field_by_offset(field_offset);
+    let value = object_ref.get_field_by_basic_type_and_offset(ty, field_offset);
     debug!(?value, "getfield");
     let frame = thread.current_frame_mut();
     frame.operand_stack.push(value);
@@ -925,6 +937,7 @@ pub fn instanceof(thread: &mut JvmThread, class: &Class) {
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = load_class(class.class_loader(), class_name);
+    init_class(thread, &class);
     let frame = thread.current_frame_mut();
     let obj_ref = frame.operand_stack.pop_jobject();
     if obj_ref.is_null() {
@@ -947,6 +960,7 @@ pub fn athrow(thread: &mut JvmThread, class: &Class) {
     let index = frame.read_u16().unwrap();
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = load_class(class.class_loader(), class_name);
+    init_class(thread, &class);
     let frame = thread.current_frame_mut();
     let obj_ref = frame.operand_stack.pop_jobject();
     if obj_ref.is_null() {

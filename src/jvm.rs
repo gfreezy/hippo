@@ -1,7 +1,7 @@
 use crate::class::{Class, Method};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 use crate::class_loader::class_path::ClassPath;
-use crate::class_loader::{load_class, BOOTSTRAP_LOADER};
+use crate::class_loader::{init_class, load_class, BOOTSTRAP_LOADER};
 use crate::frame::JvmFrame;
 use crate::gc::global_definition::{JObject, JValue};
 
@@ -53,6 +53,7 @@ impl Jvm {
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
             let system_class = load_class(JObject::null(), "java/lang/System");
+            init_class(&mut thread, &system_class);
             let system_class_initialize = system_class
                 .get_method("initializeSystemClass", "()V", true)
                 .expect("system init");
@@ -66,6 +67,7 @@ impl Jvm {
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
             let class = load_class(JObject::null(), &self.main_class);
+            init_class(&mut thread, &class);
             let main_method = class
                 .get_method("main", "([Ljava/lang/String;)V", true)
                 .unwrap();
@@ -77,6 +79,7 @@ impl Jvm {
 
 pub fn execute_method(thread: &mut JvmThread, method: Method, args: Vec<JValue>) {
     let class = load_class(method.class_loader(), method.class_name());
+    init_class(thread, &class);
     execute_class_method(thread, class, method, args)
 }
 

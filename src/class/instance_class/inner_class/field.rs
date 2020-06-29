@@ -1,7 +1,5 @@
-
 use crate::class_parser::{ACC_FINAL, ACC_STATIC};
-use crate::gc::global_definition::{JArray, JObject, JValue};
-
+use crate::gc::global_definition::{BasicType, JObject, JValue};
 
 #[derive(Debug, Clone)]
 pub struct Field {
@@ -38,6 +36,10 @@ impl Field {
 
     pub fn descriptor(&self) -> String {
         self.descriptor.clone()
+    }
+
+    pub fn basic_type(&self) -> BasicType {
+        self.descriptor.as_str().into()
     }
 
     pub fn name(&self) -> String {
@@ -85,7 +87,7 @@ impl Field {
             b'S' => JValue::Short(0),
             b'Z' => JValue::Int(0),
             b'L' => JValue::Object(JObject::null()),
-            b'[' => JValue::Array(JArray::null()),
+            b'[' => JValue::Object(JObject::null()),
             _ => unreachable!("{}", descriptor),
         }
     }

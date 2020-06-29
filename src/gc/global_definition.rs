@@ -6,7 +6,6 @@ use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
 use crate::gc::mark_word::MarkWord;
 use crate::gc::oop::{ArrayOop, InstanceOop, Oop};
 
-
 use std::mem::size_of;
 
 pub const HEAP_WORD_SIZE: usize = size_of::<usize>();
@@ -33,7 +32,7 @@ pub enum JvmType {
 }
 
 #[repr(C)]
-#[derive(PartialOrd, PartialEq, Copy, Clone)]
+#[derive(PartialOrd, PartialEq, Copy, Clone, Debug)]
 pub enum BasicType {
     // The values TBoolean..TLong (4..11) are derived from the JVMS.
     Boolean,
@@ -91,7 +90,7 @@ impl BasicType {
             BasicType::Int => JValue::Int(0),
             BasicType::Long => JValue::Long(0),
             BasicType::Object => JValue::Object(JObject::null()),
-            BasicType::Array => JValue::Array(JArray::null()),
+            BasicType::Array => JValue::Object(JObject::null()),
         }
     }
 
@@ -122,7 +121,34 @@ impl From<u8> for BasicType {
             T_SHORT => BasicType::Short,
             T_INT => BasicType::Int,
             T_LONG => BasicType::Long,
-            _ => unreachable!(),
+            b'Z' => BasicType::Boolean,
+            b'C' => BasicType::Char,
+            b'F' => BasicType::Float,
+            b'D' => BasicType::Double,
+            b'B' => BasicType::Byte,
+            b'S' => BasicType::Short,
+            b'I' => BasicType::Int,
+            b'J' => BasicType::Long,
+            b'L' => BasicType::Object,
+            v => unreachable!(v),
+        }
+    }
+}
+
+impl From<&str> for BasicType {
+    fn from(value: &str) -> Self {
+        match value {
+            "Z" => BasicType::Boolean,
+            "C" => BasicType::Char,
+            "F" => BasicType::Float,
+            "D" => BasicType::Double,
+            "B" => BasicType::Byte,
+            "S" => BasicType::Short,
+            "I" => BasicType::Int,
+            "J" => BasicType::Long,
+            ty if ty.starts_with("L") => BasicType::Object,
+            ty if ty.starts_with("[") => BasicType::Array,
+            v => unreachable!(v),
         }
     }
 }
@@ -167,12 +193,41 @@ impl JObject {
         instance_oop.set_field_by_offset(offset, v)
     }
 
+    pub fn set_field_by_jvalue_and_offset(&self, offset: usize, jvalue: JValue) {
+        match jvalue {
+            JValue::Boolean(v) => self.set_field_by_offset::<JBoolean>(offset, v),
+            JValue::Char(v) => self.set_field_by_offset::<JChar>(offset, v),
+            JValue::Float(v) => self.set_field_by_offset::<JFloat>(offset, v),
+            JValue::Double(v) => self.set_field_by_offset::<JDouble>(offset, v),
+            JValue::Byte(v) => self.set_field_by_offset::<JByte>(offset, v),
+            JValue::Short(v) => self.set_field_by_offset::<JShort>(offset, v),
+            JValue::Int(v) => self.set_field_by_offset::<JInt>(offset, v),
+            JValue::Long(v) => self.set_field_by_offset::<JLong>(offset, v),
+            JValue::Object(v) => self.set_field_by_offset::<JObject>(offset, v),
+        }
+    }
+
     pub fn get_field_by_offset<T>(&self, offset: usize) -> T
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
         let instance_oop: InstanceOop = self.0.into();
         instance_oop.get_field_by_offset(offset)
+    }
+
+    pub fn get_field_by_basic_type_and_offset(&self, ty: BasicType, offset: usize) -> JValue {
+        match ty {
+            BasicType::Boolean => self.get_field_by_offset::<JBoolean>(offset).into(),
+            BasicType::Char => self.get_field_by_offset::<JChar>(offset).into(),
+            BasicType::Float => self.get_field_by_offset::<JFloat>(offset).into(),
+            BasicType::Double => self.get_field_by_offset::<JDouble>(offset).into(),
+            BasicType::Byte => self.get_field_by_offset::<JByte>(offset).into(),
+            BasicType::Short => self.get_field_by_offset::<JShort>(offset).into(),
+            BasicType::Int => self.get_field_by_offset::<JInt>(offset).into(),
+            BasicType::Long => self.get_field_by_offset::<JLong>(offset).into(),
+            BasicType::Object => self.get_field_by_offset::<JObject>(offset).into(),
+            BasicType::Array => self.get_field_by_offset::<JObject>(offset).into(),
+        }
     }
 
     pub fn hash_code(&self) -> JInt {
@@ -202,26 +257,22 @@ impl JArray {
         JArray(array_oop)
     }
 
-    pub fn class_id(&self) -> ClassId {
-        self.0.oop().class
-    }
-
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    pub fn get<T>(&self, _i: usize) -> T
+    pub fn get<T>(&self, i: usize) -> T
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        unimplemented!()
+        self.0.element_at(i)
     }
 
-    pub fn set<T>(&self, _i: usize, _v: T)
+    pub fn set<T>(&self, i: usize, v: T)
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        unimplemented!()
+        self.0.set_element_at(i, v)
     }
 
     pub fn null() -> JArray {
@@ -254,6 +305,78 @@ impl JArray {
     }
 }
 
+impl From<JObject> for JArray {
+    fn from(o: JObject) -> Self {
+        JArray(o.0.into())
+    }
+}
+
+impl From<JArray> for JObject {
+    fn from(o: JArray) -> Self {
+        JObject(o.0.oop())
+    }
+}
+
+impl From<JArray> for JValue {
+    fn from(o: JArray) -> Self {
+        JValue::Object(o.into())
+    }
+}
+
+impl From<JObject> for JValue {
+    fn from(o: JObject) -> Self {
+        JValue::Object(o)
+    }
+}
+
+impl From<JBoolean> for JValue {
+    fn from(o: JBoolean) -> Self {
+        JValue::Boolean(o)
+    }
+}
+
+impl From<JChar> for JValue {
+    fn from(o: JChar) -> Self {
+        JValue::Char(o)
+    }
+}
+
+impl From<JFloat> for JValue {
+    fn from(o: JFloat) -> Self {
+        JValue::Float(o)
+    }
+}
+
+impl From<JDouble> for JValue {
+    fn from(o: JDouble) -> Self {
+        JValue::Double(o)
+    }
+}
+
+impl From<JByte> for JValue {
+    fn from(o: JByte) -> Self {
+        JValue::Byte(o)
+    }
+}
+
+impl From<JShort> for JValue {
+    fn from(o: JShort) -> Self {
+        JValue::Short(o)
+    }
+}
+
+impl From<JInt> for JValue {
+    fn from(o: JInt) -> Self {
+        JValue::Int(o)
+    }
+}
+
+impl From<JLong> for JValue {
+    fn from(o: JLong) -> Self {
+        JValue::Long(o)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
 pub enum JValue {
@@ -266,7 +389,6 @@ pub enum JValue {
     Int(JInt),
     Long(JLong),
     Object(JObject),
-    Array(JArray),
 }
 
 impl JValue {
@@ -279,7 +401,7 @@ impl JValue {
 
     pub fn as_jarray(&self) -> JArray {
         match self {
-            JValue::Array(a) => *a,
+            JValue::Object(a) => (*a).into(),
             _ => unreachable!(),
         }
     }
@@ -316,20 +438,18 @@ impl JValue {
         assert!(self.is_reference_type());
         match self {
             JValue::Object(o) => o.is_null(),
-            JValue::Array(o) => o.is_null(),
             _ => unreachable!(),
         }
     }
 
     pub fn is_reference_type(&self) -> bool {
-        matches!(self, JValue::Object(_) | JValue::Array(_))
+        matches!(self, JValue::Object(_))
     }
 
     pub fn class_id(&self) -> ClassId {
         assert!(self.is_reference_type());
         match self {
             JValue::Object(o) => o.class_id(),
-            JValue::Array(o) => o.class_id(),
             _ => unreachable!(),
         }
     }

@@ -10,7 +10,7 @@ pub use self::instance_class::Method;
 pub use self::instance_class::SuperClassesIter;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
 pub use self::instance_mirror_class::InstanceMirrorClass;
-use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
+pub use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
 use crate::class_loader::get_class_id_by_name;
 use crate::class_parser::constant_pool::ConstPool;
 
@@ -85,40 +85,108 @@ impl Class {
         }
     }
 
+    pub fn is_inited(&self) -> bool {
+        match self {
+            Class::InstanceClass(c) => c.is_inited(),
+            Class::InstanceClassLoaderClass(c) => c.is_inited(),
+            Class::InstanceMirrorClass(c) => c.is_inited(),
+            Class::TypeArrayClass(_) => true,
+            Class::ObjArrayClass(c) => c.is_inited(),
+        }
+    }
+
+    pub fn set_inited(&self) {
+        match self {
+            Class::InstanceClass(c) => c.set_inited(),
+            Class::InstanceClassLoaderClass(c) => c.set_inited(),
+            Class::InstanceMirrorClass(c) => c.set_inited(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => {}
+        }
+    }
+
     pub fn set_ty(&self, _ty: ClassType) {
         unimplemented!()
     }
 
     pub fn is_interface(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_interface(),
+            Class::InstanceClassLoaderClass(c) => c.is_interface(),
+            Class::InstanceMirrorClass(c) => c.is_interface(),
+            Class::TypeArrayClass(_) => false,
+            Class::ObjArrayClass(_) => false,
+        }
     }
 
     pub fn is_class(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_class(),
+            Class::InstanceClassLoaderClass(c) => c.is_class(),
+            Class::InstanceMirrorClass(c) => c.is_class(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_static(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_static(),
+            Class::InstanceClassLoaderClass(c) => c.is_static(),
+            Class::InstanceMirrorClass(c) => c.is_static(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_super(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_super(),
+            Class::InstanceClassLoaderClass(c) => c.is_super(),
+            Class::InstanceMirrorClass(c) => c.is_super(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_public(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_public(),
+            Class::InstanceClassLoaderClass(c) => c.is_public(),
+            Class::InstanceMirrorClass(c) => c.is_public(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_private(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_private(),
+            Class::InstanceClassLoaderClass(c) => c.is_private(),
+            Class::InstanceMirrorClass(c) => c.is_private(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_protected(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_protected(),
+            Class::InstanceClassLoaderClass(c) => c.is_protected(),
+            Class::InstanceMirrorClass(c) => c.is_protected(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn is_final(&self) -> bool {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.is_final(),
+            Class::InstanceClassLoaderClass(c) => c.is_final(),
+            Class::InstanceMirrorClass(c) => c.is_final(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn class_loader(&self) -> JObject {
@@ -126,8 +194,8 @@ impl Class {
             Class::InstanceClass(c) => c.class_loader(),
             Class::InstanceClassLoaderClass(c) => c.class_loader(),
             Class::InstanceMirrorClass(c) => c.class_loader(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(c) => c.class_loader(),
+            Class::ObjArrayClass(c) => c.class_loader(),
         }
     }
 
@@ -141,12 +209,24 @@ impl Class {
         }
     }
 
-    pub fn set_instance_size(&self, _size: usize) {
-        unimplemented!()
+    pub fn set_instance_size(&self, size: usize) {
+        match self {
+            Class::InstanceClass(c) => c.set_instance_size(size),
+            Class::InstanceClassLoaderClass(c) => c.set_instance_size(size),
+            Class::InstanceMirrorClass(c) => c.set_instance_size(size),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn static_size(&self) -> usize {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.static_size(),
+            Class::InstanceClassLoaderClass(c) => c.static_size(),
+            Class::InstanceMirrorClass(c) => c.static_size(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn constant_pool(&self) -> &ConstPool {
@@ -164,7 +244,13 @@ impl Class {
     }
 
     pub fn super_class(&self) -> Option<Class> {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.super_class(),
+            Class::InstanceClassLoaderClass(c) => c.super_class(),
+            Class::InstanceMirrorClass(c) => c.super_class(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn instance_fields(&self) -> &HashMap<String, Field, RandomState> {
@@ -180,7 +266,13 @@ impl Class {
     }
 
     pub fn interfaces(&self) -> &[Class] {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.interfaces(),
+            Class::InstanceClassLoaderClass(c) => c.interfaces(),
+            Class::InstanceMirrorClass(c) => c.interfaces(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -188,17 +280,29 @@ impl Class {
             Class::InstanceClass(c) => c.name(),
             Class::InstanceClassLoaderClass(c) => c.name(),
             Class::InstanceMirrorClass(c) => c.name(),
+            Class::TypeArrayClass(c) => c.name(),
+            Class::ObjArrayClass(c) => c.name(),
+        }
+    }
+
+    pub fn iter_super_classes(&self) -> SuperClassesIter {
+        match self {
+            Class::InstanceClass(c) => c.iter_super_classes(),
+            Class::InstanceClassLoaderClass(c) => c.iter_super_classes(),
+            Class::InstanceMirrorClass(c) => c.iter_super_classes(),
             Class::TypeArrayClass(_) => unreachable!(),
             Class::ObjArrayClass(_) => unreachable!(),
         }
     }
 
-    pub fn iter_super_classes(&self) -> SuperClassesIter {
-        unimplemented!()
-    }
-
-    pub fn did_implement_interface(&self, _interface: Class) -> bool {
-        unimplemented!()
+    pub fn did_implement_interface(&self, interface: Class) -> bool {
+        match self {
+            Class::InstanceClass(c) => c.did_implement_interface(interface),
+            Class::InstanceClassLoaderClass(c) => c.did_implement_interface(interface),
+            Class::InstanceMirrorClass(c) => c.did_implement_interface(interface),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn clinit_method(&self) -> Option<Method> {
@@ -215,34 +319,59 @@ impl Class {
         unimplemented!()
     }
 
-    pub fn get_self_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
-        unimplemented!()
+    pub fn get_self_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+        match self {
+            Class::InstanceClass(c) => c.get_self_field(name, descriptor),
+            Class::InstanceClassLoaderClass(c) => c.get_self_field(name, descriptor),
+            Class::InstanceMirrorClass(c) => c.get_self_field(name, descriptor),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
-    pub fn get_interface_field(&self, _name: &str, _descriptor: &str) -> Option<Field> {
-        unimplemented!()
+    pub fn get_interface_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+        match self {
+            Class::InstanceClass(c) => c.get_interface_field(name, descriptor),
+            Class::InstanceClassLoaderClass(c) => c.get_interface_field(name, descriptor),
+            Class::InstanceMirrorClass(c) => c.get_interface_field(name, descriptor),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
-    pub fn get_self_method(
-        &self,
-        _name: &str,
-        _descriptor: &str,
-        _is_static: bool,
-    ) -> Option<Method> {
-        unimplemented!()
+    pub fn get_self_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
+        match self {
+            Class::InstanceClass(c) => c.get_self_method(name, descriptor, is_static),
+            Class::InstanceClassLoaderClass(c) => c.get_self_method(name, descriptor, is_static),
+            Class::InstanceMirrorClass(c) => c.get_self_method(name, descriptor, is_static),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn get_class_method(
         &self,
-        _name: &str,
-        _descriptor: &str,
-        _is_static: bool,
+        name: &str,
+        descriptor: &str,
+        is_static: bool,
     ) -> Option<Method> {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.get_class_method(name, descriptor, is_static),
+            Class::InstanceClassLoaderClass(c) => c.get_class_method(name, descriptor, is_static),
+            Class::InstanceMirrorClass(c) => c.get_class_method(name, descriptor, is_static),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
-    pub fn get_interface_method(&self, _name: &str, _descriptor: &str) -> Option<Method> {
-        unimplemented!()
+    pub fn get_interface_method(&self, name: &str, descriptor: &str) -> Option<Method> {
+        match self {
+            Class::InstanceClass(c) => c.get_interface_method(name, descriptor),
+            Class::InstanceClassLoaderClass(c) => c.get_interface_method(name, descriptor),
+            Class::InstanceMirrorClass(c) => c.get_interface_method(name, descriptor),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn get_method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Method> {
@@ -275,8 +404,14 @@ impl Class {
         }
     }
 
-    pub fn is_subclass_of(&self, _class: Class) -> bool {
-        unimplemented!()
+    pub fn is_subclass_of(&self, class: Class) -> bool {
+        match self {
+            Class::InstanceClass(c) => c.is_subclass_of(class),
+            Class::InstanceClassLoaderClass(c) => c.is_subclass_of(class),
+            Class::InstanceMirrorClass(c) => c.is_subclass_of(class),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn as_instance_mirror_class(&self) -> InstanceMirrorClass {
@@ -301,9 +436,13 @@ pub enum ClassType {
 
 pub fn alloc_jobject(class: &Class) -> JObject {
     let size = class.instance_size() + InstanceOopDesc::header_size_in_bytes();
-    let _oop = alloc_tlab(size);
 
     JObject::new(alloc_tlab(size), get_class_id_by_name(class.name()))
+}
+
+pub fn alloc_empty_jobject() -> JObject {
+    let size = InstanceOopDesc::header_size_in_bytes();
+    JObject::new(alloc_tlab(size), 0)
 }
 
 pub fn alloc_jarray(ty: BasicType, class_id: ClassId, len: usize) -> JArray {

@@ -40,7 +40,7 @@ impl OperandStack {
     }
 
     pub fn push_jarray(&mut self, v: JArray) {
-        self.push(JValue::Array(v))
+        self.push(v.into())
     }
 
     pub fn pop(&mut self) -> JValue {
@@ -54,6 +54,7 @@ impl OperandStack {
     pub fn pop_jint(&mut self) -> JInt {
         match self.stack.pop() {
             Some(JValue::Int(num)) => num,
+            Some(JValue::Boolean(num)) => num as JInt,
             v => unreachable!("{:?}", v),
         }
     }

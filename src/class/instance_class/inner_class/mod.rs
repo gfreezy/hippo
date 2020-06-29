@@ -18,11 +18,12 @@ use crate::jenv::new_java_lang_string;
 use field::Field;
 use nom::lib::std::collections::HashMap;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::java_const::JAVA_LANG_CLASS;
 use crate::jthread::JvmThread;
 use crossbeam::atomic::AtomicCell;
+use std::sync::atomic::Ordering::SeqCst;
 use tracing::trace;
 
 #[repr(C)]
@@ -38,6 +39,7 @@ pub struct InnerClass {
     mirror_class: AtomicCell<JObject>,
     instance_size: AtomicU64,
     static_size: usize,
+    inited: AtomicBool,
     loader: JObject,
 }
 
@@ -119,21 +121,20 @@ impl InnerClass {
             mirror_class: AtomicCell::new(JObject::null()),
             instance_size: AtomicU64::new(instance_offset as u64),
             static_size: static_offset,
+            inited: AtomicBool::new(false),
             loader,
         };
         inner_class
     }
 
     pub fn mirror_class(&self) -> JObject {
-        if self.name() != JAVA_LANG_CLASS {
-            JObject::null()
-        } else if self.mirror_class.load().is_null() {
+        if self.mirror_class.load().is_null() {
             let mirror_class = InstanceMirrorClass::new(self.name(), self.loader);
             let mirror = alloc_jobject(&mirror_class.into());
             self.mirror_class.store(mirror);
             mirror
         } else {
-            unreachable!()
+            self.mirror_class.load()
         }
     }
 
@@ -224,6 +225,13 @@ impl InnerClass {
         &self.name
     }
 
+    pub fn is_inited(&self) -> bool {
+        self.inited.load(SeqCst)
+    }
+    pub fn set_inited(&self) {
+        self.inited.store(true, SeqCst)
+    }
+
     pub fn iter_super_classes(&self) -> SuperClassesIter {
         SuperClassesIter(self.super_class.clone())
     }
@@ -307,14 +315,14 @@ impl InnerClass {
         self.get_interface_method_inner(name, descriptor)
     }
 
-    fn get_self_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+    pub fn get_self_field(&self, name: &str, descriptor: &str) -> Option<Field> {
         self.instance_fields()
             .get(name)
             .filter(|f| f.descriptor() == descriptor)
             .cloned()
     }
 
-    fn get_interface_field(&self, name: &str, descriptor: &str) -> Option<Field> {
+    pub fn get_interface_field(&self, name: &str, descriptor: &str) -> Option<Field> {
         assert!(self.is_interface());
         if let Some(field) = self.get_self_field(name, descriptor) {
             return Some(field);
@@ -405,7 +413,6 @@ fn get_default_value_from_field_info(
             "F" => JValue::Float(const_pool.get_constant_float_at(constant_value_index)),
             "J" => JValue::Long(const_pool.get_constant_long_at(constant_value_index)),
             "Ljava/lang/String;" => JValue::Object(new_java_lang_string(
-                thread,
                 const_pool.get_constant_string_at(constant_value_index),
             )),
             _ => unreachable!(),

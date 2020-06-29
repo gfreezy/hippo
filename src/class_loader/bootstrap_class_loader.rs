@@ -1,5 +1,5 @@
-use crate::class::Class;
-use crate::class::{alloc_jobject, InstanceClass, InstanceMirrorClass};
+use crate::class::{alloc_jobject, InstanceClass, InstanceMirrorClass, ObjArrayClass};
+use crate::class::{Class, TypeArrayClass};
 use crate::class_loader::class_path::ClassPath;
 use crate::class_parser::parse_class_file;
 use crate::gc::global_definition::JObject;
@@ -23,15 +23,31 @@ impl BootstrapClassLoader {
         debug!(%name, "load_class");
         let name_bytes = name.as_bytes();
         match name_bytes {
-            [b'[', .., b'L'] => unimplemented!(),
-            [b'[', _ty, ..] => unimplemented!(),
+            [b'[', ty] => {
+                let dimension = name_bytes.len() - 1;
+                Class::TypeArrayClass(TypeArrayClass::new(
+                    name.to_string(),
+                    (*ty).into(),
+                    dimension,
+                    JObject::null(),
+                ))
+            }
+            [b'[', b'L', class_name @ .., b';'] => {
+                let dimension = 1;
+                Class::ObjArrayClass(ObjArrayClass::new(
+                    name.to_string(),
+                    load_class(JObject::null(), std::str::from_utf8(class_name).unwrap()),
+                    dimension,
+                    JObject::null(),
+                ))
+            }
             [b'L', name_slice @ .., b';'] | name_slice => {
-                let name = std::str::from_utf8(name_slice).unwrap();
+                let class_name = std::str::from_utf8(name_slice).unwrap();
                 let data = self
                     .class_path
-                    .read_class(name)
+                    .read_class(class_name)
                     .unwrap_or_else(|_| panic!("read class file: {}", name));
-                self.define_class(name.to_string(), data).into()
+                self.define_class(class_name.to_string(), data).into()
             }
         }
     }

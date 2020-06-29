@@ -7,7 +7,7 @@ use crate::class_parser::{
     is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
     ACC_STATIC, ACC_VARARGS,
 };
-use crate::gc::global_definition::JObject;
+use crate::gc::global_definition::{BasicType, JObject};
 
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -112,28 +112,28 @@ impl Method {
         self.inner.loader
     }
 
-    pub fn resolve_static_field(&self, pc: usize) -> Option<(Class, usize)> {
+    pub fn resolve_static_field(&self, pc: usize) -> Option<(Class, BasicType, usize)> {
         self.inner.cp_cache.lock().unwrap().resolve_static_field(pc)
     }
 
-    pub fn resolve_field(&self, pc: usize) -> Option<usize> {
+    pub fn resolve_field(&self, pc: usize) -> Option<(BasicType, usize)> {
         self.inner.cp_cache.lock().unwrap().resolve_field(pc)
     }
 
-    pub fn set_field(&self, pc: usize, field_index: usize) {
+    pub fn set_field(&self, pc: usize, ty: BasicType, field_index: usize) {
         self.inner
             .cp_cache
             .lock()
             .unwrap()
-            .set_field(pc, field_index)
+            .set_field(pc, ty, field_index)
     }
 
-    pub fn set_static_field(&self, pc: usize, class: Class, field_index: usize) {
+    pub fn set_static_field(&self, pc: usize, class: Class, ty: BasicType, field_index: usize) {
         self.inner
             .cp_cache
             .lock()
             .unwrap()
-            .set_static_field(pc, class, field_index)
+            .set_static_field(pc, class, ty, field_index)
     }
 
     pub fn n_args(&self) -> usize {

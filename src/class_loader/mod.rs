@@ -75,12 +75,28 @@ fn register_class(class: Class, loader: JObject) -> ClassId {
         entry.or_insert(class_id);
         class_id
     };
-    //
-    // let clinit_method = class.clinit_method();
-    // if let Some(clinit_method) = clinit_method {
-    //     execute_class_method(thread, class, clinit_method, vec![]);
-    // }
+
     class_id
+}
+
+pub fn init_class(thread: &mut JvmThread, class: &Class) {
+    if class.is_inited() {
+        return;
+    }
+
+    for c in class.iter_super_classes() {
+        init_class(thread, &c);
+    }
+
+    for i in class.interfaces() {
+        init_class(thread, i);
+    }
+
+    class.set_inited();
+    let clinit_method = class.clinit_method();
+    if let Some(clinit_method) = clinit_method {
+        execute_class_method(thread, class.clone(), clinit_method, vec![]);
+    }
 }
 
 pub fn load_class(loader: JObject, name: &str) -> Class {
