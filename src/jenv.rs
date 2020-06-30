@@ -1,15 +1,21 @@
 use crate::class::{alloc_jarray, alloc_jobject, Class, Method};
-use crate::class_loader::{get_class_id_by_name, load_class};
+use crate::class_loader::{get_class_by_id, get_class_id_by_name, load_class};
 
 use crate::gc::global_definition::{BasicType, JArray, JObject};
 
+use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
 use crate::java_const::JAVA_LANG_STRING;
 use crate::jthread::JvmThread;
+use nom::lib::std::collections::HashSet;
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use std::cell::RefCell;
 
 thread_local! {
     pub static JTHREAD: RefCell<JvmThread> = RefCell::new(JvmThread::new());
 }
+
+pub static THREADS: OnceCell<Mutex<HashSet<i64>>> = OnceCell::new();
 
 pub fn new_jobject(class: Class) -> JObject {
     alloc_jobject(&class)
@@ -44,6 +50,26 @@ pub fn get_java_string(obj: JObject) -> String {
     let chars_ref = obj.get_field_by_offset::<JArray>(f.offset());
     let bytes: Vec<u16> = chars_ref.as_slice().to_vec();
     String::from_utf16(&bytes).unwrap()
+}
+
+pub fn set_object_field<T>(obj: JObject, name: &str, descriptor: &str, value: T)
+where
+    TypeToBasicType<T>: Into<BasicType>,
+{
+    let class_id = obj.class_id();
+    let class = get_class_by_id(class_id);
+    let f = class.get_field(name, descriptor).unwrap();
+    obj.set_field_by_offset::<T>(f.offset(), value);
+}
+
+pub fn get_object_field<T>(obj: JObject, name: &str, descriptor: &str) -> T
+where
+    TypeToBasicType<T>: Into<BasicType>,
+{
+    let class_id = obj.class_id();
+    let class = get_class_by_id(class_id);
+    let f = class.get_field(name, descriptor).unwrap();
+    obj.get_field_by_offset::<T>(f.offset())
 }
 
 pub fn did_override_method(method: &Method, other: &Method) -> bool {

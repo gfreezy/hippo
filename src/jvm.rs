@@ -10,9 +10,11 @@ use crate::gc::space::Space;
 use crate::gc::tlab::initialize_tlab;
 use crate::instruction::opcode::show_opcode;
 use crate::instruction::*;
-use crate::jenv::JTHREAD;
+use crate::jenv::{JTHREAD, THREADS};
 use crate::jthread::JvmThread;
 use crate::native::*;
+use nom::lib::std::collections::HashSet;
+use parking_lot::Mutex;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -50,6 +52,7 @@ impl Jvm {
         BOOTSTRAP_LOADER
             .set(BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)))
             .unwrap();
+        THREADS.set(Mutex::new(HashSet::new())).unwrap();
         initialize_tlab(AllocatorLocal::new(Arc::new(Space::new(1024 * 1024 * 100))));
 
         JTHREAD.with(|thread| {
@@ -77,6 +80,20 @@ impl Jvm {
             execute_class_method(&mut thread, class, main_method, vec![]);
         });
     }
+}
+
+pub fn execute_method_by_name(
+    thread: &mut JvmThread,
+    class: &Class,
+    name: &str,
+    descriptor: &str,
+    is_static: bool,
+    args: Vec<JValue>,
+) {
+    let method = class
+        .get_method(name, descriptor, is_static)
+        .expect("no method found");
+    execute_method(thread, method, args);
 }
 
 pub fn execute_method(thread: &mut JvmThread, method: Method, args: Vec<JValue>) {
@@ -568,6 +585,12 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
             java_lang_Thread_setPriority0(thread, class, args)
         }
         ("java/lang/Thread", "isAlive", "()Z") => java_lang_Thread_isAlive(thread, class, args),
+        ("java/lang/Thread", "start0", "()V") => {
+            java_lang_Thread_start0(thread, class, args);
+        }
+        ("java/lang/Class", "getDeclaredFields0", "(Z)[Ljava/lang/reflect/Field;") => {
+            java_lang_Class_getDeclaredFields0(thread, class, args);
+        }
         (class_name, name, descriptor) => {
             panic!(
                 r#"native method: ("{}", "{}", "{}")"#,

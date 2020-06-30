@@ -2,11 +2,13 @@
 
 use crate::class::{alloc_empty_jobject, alloc_jobject, Class};
 use crate::class_loader::{get_class_by_id, init_class, load_class};
-use crate::gc::global_definition::{JObject, JValue};
+use crate::gc::global_definition::{JLong, JObject, JValue};
 use crate::java_const::{JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP};
-use crate::jenv::{get_java_string, new_java_lang_string};
+use crate::jenv::{
+    get_java_string, get_object_field, new_java_lang_string, set_object_field, JTHREAD, THREADS,
+};
 use crate::jthread::JvmThread;
-use crate::jvm::execute_method;
+use crate::jvm::{execute_method, execute_method_by_name};
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 
@@ -30,6 +32,27 @@ pub fn java_lang_Class_getPrimitiveClass(
     let primitive_class = primitive_classes.get(&class_name).unwrap();
     let frame = thread.current_frame_mut();
     frame.operand_stack.push_jobject(primitive_class.clone());
+}
+
+pub fn java_lang_Class_getDeclaredFields0(
+    thread: &mut JvmThread,
+    class: &Class,
+    args: Vec<JValue>,
+) {
+    // todo: fixup
+    let obj = args[0].as_jobject();
+    let public_only = args[1].as_jbool();
+    let class = get_class_by_id(obj.class_id());
+
+    let num_fields = if public_only {
+        class
+            .instance_fields()
+            .values()
+            .filter(|f| f.is_public())
+            .count()
+    } else {
+        class.instance_fields().len()
+    };
 }
 
 pub fn jvm_desiredAssertionStatus0(thread: &mut JvmThread, _class: &Class, _args: Vec<JValue>) {
@@ -190,20 +213,28 @@ pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, arg
         let thread_group_class = load_class(JObject::null(), JAVA_LANG_THREAD_GROUP);
         init_class(thread, &thread_group_class);
         let thread_group_object = alloc_jobject(&thread_group_class);
-        let default_init = thread_group_class
-            .get_self_method("<init>", "()V", false)
-            .expect("no init found");
-        execute_method(thread, default_init, vec![thread_group_object.into()]);
+        execute_method_by_name(
+            thread,
+            &thread_group_class,
+            "<init>",
+            "()V",
+            false,
+            vec![thread_group_object.into()],
+        );
 
         let thread_class = load_class(JObject::null(), JAVA_LANG_THREAD);
         init_class(thread, &thread_class);
         thread_object = alloc_jobject(&thread_class);
-        let field = thread_class
-            .get_field("group", "Ljava/lang/ThreadGroup;")
-            .unwrap();
-        thread_object.set_field_by_offset(field.offset(), thread_group_object);
-        let field = thread_class.get_field("priority", "I").unwrap();
-        thread_object.set_field_by_offset(field.offset(), 1);
+        set_object_field(
+            thread_object,
+            "group",
+            "Ljava/lang/ThreadGroup;",
+            thread_group_object,
+        );
+        set_object_field(thread_object, "priority", "I", 1);
+        let thread_id = thread_id::get() as i64;
+        THREADS.get().unwrap().lock().insert(thread_id);
+        set_object_field(thread_object, "tid", "J", thread_id);
 
         thread.set_thread_object(thread_object);
     }
@@ -250,14 +281,28 @@ pub fn java_lang_Thread_setPriority0(thread: &mut JvmThread, class: &Class, args
     }
 }
 
-// todo: continue here
 pub fn java_lang_Thread_isAlive(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let priority = args[1].as_jint();
-    if priority < 1 {
-        let object_ref = args[0].as_jobject();
-        let class_id = object_ref.class_id();
-        let class = get_class_by_id(class_id);
-        let field = class.get_field("priority", "I").unwrap();
-        object_ref.set_field_by_offset(field.offset(), 5);
-    }
+    let obj = args[0].as_jobject();
+    let tid: JLong = get_object_field(obj, "tid", "J");
+    let alive = THREADS.get().unwrap().lock().contains(&tid);
+    thread.current_frame_mut().operand_stack.push_jbool(alive)
+}
+
+pub fn java_lang_Thread_start0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let obj = args[0].as_jobject();
+    let class = class.clone();
+    std::thread::spawn(move || {
+        JTHREAD.with(|thread| {
+            execute_method_by_name(
+                &mut thread.borrow_mut(),
+                &class,
+                "run",
+                "()V",
+                false,
+                vec![obj.into()],
+            )
+        });
+        let thread_id = thread_id::get() as i64;
+        THREADS.get().unwrap().lock().remove(&thread_id);
+    });
 }

@@ -1,4 +1,4 @@
-use crate::class_parser::{ACC_FINAL, ACC_STATIC};
+use crate::class_parser::{ACC_FINAL, ACC_PUBLIC, ACC_STATIC};
 use crate::gc::global_definition::{BasicType, JObject, JValue};
 
 #[derive(Debug, Clone)]
@@ -69,6 +69,10 @@ impl Field {
 
     pub fn is_static(&self) -> bool {
         self.access_flags() & ACC_STATIC != 0
+    }
+
+    pub fn is_public(&self) -> bool {
+        self.access_flags() & ACC_PUBLIC != 0
     }
 
     pub fn is_final(&self) -> bool {

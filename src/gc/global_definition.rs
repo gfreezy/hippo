@@ -413,6 +413,13 @@ impl JValue {
         }
     }
 
+    pub fn as_jbool(&self) -> bool {
+        match self {
+            JValue::Boolean(b) => *b == 1,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn as_jdouble(&self) -> JDouble {
         match self {
             JValue::Double(a) => *a,

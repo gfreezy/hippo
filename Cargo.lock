@@ -405,6 +405,7 @@ dependencies = [
  "nom",
  "once_cell",
  "parking_lot",
+ "thread-id",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

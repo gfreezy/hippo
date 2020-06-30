@@ -20,7 +20,6 @@ use crate::gc::global_definition::{
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::alloc_tlab;
 
-use nom::lib::std::collections::hash_map::RandomState;
 use nom::lib::std::collections::HashMap;
 use std::fmt;
 
@@ -242,12 +241,24 @@ impl Class {
         }
     }
 
-    pub fn instance_fields(&self) -> &HashMap<String, Field, RandomState> {
-        unimplemented!()
+    pub fn instance_fields(&self) -> &HashMap<String, Field> {
+        match self {
+            Class::InstanceClass(c) => c.instance_fields(),
+            Class::InstanceClassLoaderClass(c) => c.instance_fields(),
+            Class::InstanceMirrorClass(c) => c.instance_fields(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
-    pub fn static_fields(&self) -> &HashMap<String, Field, RandomState> {
-        unimplemented!()
+    pub fn static_fields(&self) -> &HashMap<String, Field> {
+        match self {
+            Class::InstanceClass(c) => c.static_fields(),
+            Class::InstanceClassLoaderClass(c) => c.static_fields(),
+            Class::InstanceMirrorClass(c) => c.static_fields(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn methods(&self) -> &[Method] {

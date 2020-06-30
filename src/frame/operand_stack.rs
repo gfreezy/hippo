@@ -24,6 +24,13 @@ impl OperandStack {
         self.push(JValue::Int(num))
     }
 
+    pub fn push_jbool(&mut self, b: bool) {
+        match b {
+            true => self.push(JValue::Boolean(1)),
+            false => self.push(JValue::Boolean(0)),
+        }
+    }
+
     pub fn push_jlong(&mut self, num: JLong) {
         self.push(JValue::Long(num))
     }
