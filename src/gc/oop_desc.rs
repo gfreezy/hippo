@@ -3,11 +3,10 @@ use crate::gc::address::Address;
 use crate::gc::global_definition::type_to_basic_type::{
     size_of_java_type, type_to_basic_type, TypeToBasicType,
 };
-use crate::gc::global_definition::{BasicType, JArray, JObject, HEAP_WORD_SIZE};
+use crate::gc::global_definition::{BasicType, HEAP_WORD_SIZE};
 use crate::gc::mark_word::MarkWord;
-use crate::gc::mem::{align_usize, is_aligned, view_memory};
+use crate::gc::mem::{align_usize, is_aligned};
 
-use std::any::type_name;
 use std::mem::{size_of, transmute};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -156,7 +155,7 @@ impl ArrayOopDesc {
             let self_offset: *const T = transmute(self);
             assert!(is_aligned(data_offset, size_of::<T>()));
             let data_pointer = self_offset.offset((data_offset / size_of::<T>()) as isize);
-            unsafe { std::slice::from_raw_parts(data_pointer, self.len()) }
+            std::slice::from_raw_parts(data_pointer, self.len())
         }
     }
 

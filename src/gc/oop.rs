@@ -26,12 +26,14 @@ impl Deref for Oop {
     type Target = OopDesc;
 
     fn deref(&self) -> &Self::Target {
+        assert!(!self.is_empty());
         unsafe { mem::transmute(self.0.as_ptr::<Self::Target>()) }
     }
 }
 
 impl DerefMut for Oop {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        assert!(!self.is_empty());
         unsafe { mem::transmute(self.0.as_ptr::<Self::Target>()) }
     }
 }
@@ -54,6 +56,7 @@ impl Deref for InstanceOop {
     type Target = InstanceOopDesc;
 
     fn deref(&self) -> &Self::Target {
+        assert!(!self.is_empty());
         unsafe { mem::transmute((self.0).0.as_ptr::<Self::Target>()) }
     }
 }
@@ -81,6 +84,7 @@ impl Deref for ArrayOop {
     type Target = ArrayOopDesc;
 
     fn deref(&self) -> &Self::Target {
+        assert!(!self.is_empty());
         unsafe { mem::transmute((self.0).0.as_ptr::<Self::Target>()) }
     }
 }

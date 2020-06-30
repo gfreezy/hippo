@@ -1,5 +1,4 @@
 use crate::gc::os;
-use std::mem;
 use std::mem::size_of;
 
 #[inline(always)]

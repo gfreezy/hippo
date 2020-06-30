@@ -1,12 +1,11 @@
-use crate::class::{alloc_jobject, InstanceClass, InstanceMirrorClass, ObjArrayClass};
 use crate::class::{Class, TypeArrayClass};
+use crate::class::{InstanceClass, InstanceMirrorClass, ObjArrayClass};
 use crate::class_loader::class_path::ClassPath;
 use crate::class_parser::parse_class_file;
 use crate::gc::global_definition::JObject;
 
-use crate::class_loader::{load_class, register_class};
-use crate::java_const::{JAVA_LANG_CLASS, JAVA_LANG_OBJECT};
-use crate::jthread::JvmThread;
+use crate::class_loader::load_class;
+use crate::java_const::JAVA_LANG_CLASS;
 use tracing::debug;
 
 #[derive(Debug)]
@@ -47,7 +46,13 @@ impl BootstrapClassLoader {
                     .class_path
                     .read_class(class_name)
                     .unwrap_or_else(|_| panic!("read class file: {}", name));
-                self.define_class(class_name.to_string(), data).into()
+                let instance_class = self.define_class(class_name.to_string(), data);
+                if class_name == JAVA_LANG_CLASS {
+                    let mirror_class: InstanceMirrorClass = instance_class.into();
+                    mirror_class.into()
+                } else {
+                    instance_class.into()
+                }
             }
         }
     }

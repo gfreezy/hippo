@@ -17,14 +17,12 @@ use crate::class_parser::constant_pool::ConstPool;
 use crate::gc::global_definition::{
     BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
 };
-use crate::gc::oop::Oop;
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::alloc_tlab;
 
 use nom::lib::std::collections::hash_map::RandomState;
 use nom::lib::std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum Class {
@@ -57,6 +55,7 @@ impl Class {
     pub fn as_instance_class(&self) -> InstanceClass {
         match self {
             Class::InstanceClass(c) => c.clone(),
+            Class::InstanceMirrorClass(c) => c.clone().into(),
             _ => unreachable!(),
         }
     }
@@ -70,8 +69,8 @@ impl Class {
             Class::InstanceClass(c) => c.mirror_class(),
             Class::InstanceClassLoaderClass(c) => c.mirror_class(),
             Class::InstanceMirrorClass(c) => c.mirror_class(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(c) => c.mirror_class(),
+            Class::ObjArrayClass(c) => c.mirror_class(),
         }
     }
 
@@ -199,16 +198,6 @@ impl Class {
         }
     }
 
-    pub fn set_mirror_class(&self, mirror: JObject) {
-        match self {
-            Class::InstanceClass(c) => c.set_mirror_class(mirror),
-            Class::InstanceClassLoaderClass(c) => c.set_mirror_class(mirror),
-            Class::InstanceMirrorClass(c) => c.set_mirror_class(mirror),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
-        }
-    }
-
     pub fn set_instance_size(&self, size: usize) {
         match self {
             Class::InstanceClass(c) => c.set_instance_size(size),
@@ -224,8 +213,8 @@ impl Class {
             Class::InstanceClass(c) => c.static_size(),
             Class::InstanceClassLoaderClass(c) => c.static_size(),
             Class::InstanceMirrorClass(c) => c.static_size(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(_) => 0,
+            Class::ObjArrayClass(_) => 0,
         }
     }
 
@@ -262,7 +251,13 @@ impl Class {
     }
 
     pub fn methods(&self) -> &[Method] {
-        unimplemented!()
+        match self {
+            Class::InstanceClass(c) => c.methods(),
+            Class::InstanceClassLoaderClass(c) => c.methods(),
+            Class::InstanceMirrorClass(c) => c.methods(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
     }
 
     pub fn interfaces(&self) -> &[Class] {

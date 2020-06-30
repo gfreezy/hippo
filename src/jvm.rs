@@ -7,7 +7,7 @@ use crate::gc::global_definition::{JObject, JValue};
 
 use crate::gc::allocator_local::AllocatorLocal;
 use crate::gc::space::Space;
-use crate::gc::tlab::{initialize_tlab, ALLOCATOR_LOCAL};
+use crate::gc::tlab::initialize_tlab;
 use crate::instruction::opcode::show_opcode;
 use crate::instruction::*;
 use crate::jenv::JTHREAD;
@@ -47,7 +47,9 @@ impl Jvm {
         let jvm = Jvm {
             main_class: class_name.to_string(),
         };
-        BOOTSTRAP_LOADER.set(BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)));
+        BOOTSTRAP_LOADER
+            .set(BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)))
+            .unwrap();
         initialize_tlab(AllocatorLocal::new(Arc::new(Space::new(1024 * 1024 * 100))));
 
         JTHREAD.with(|thread| {
@@ -90,6 +92,11 @@ pub fn execute_class_method(
     args: Vec<JValue>,
 ) {
     assert_eq!(class.name(), method.class_name());
+    if method.is_static() {
+        assert_eq!(method.n_args(), args.len());
+    } else {
+        assert_eq!(method.n_args() + 1, args.len());
+    }
 
     let is_native = method.is_native();
 
@@ -268,6 +275,10 @@ pub fn execute_class_method(
                 areturn(thread, &class);
                 break;
             }
+            opcode::LRETURN => {
+                lreturn(thread, &class);
+                break;
+            }
             opcode::RETURN => {
                 return_(thread, &class);
                 break;
@@ -296,6 +307,9 @@ pub fn execute_class_method(
             }
             opcode::DUP => {
                 dup(thread, &class);
+            }
+            opcode::DUP2 => {
+                dup2(thread, &class);
             }
             opcode::CASTORE => {
                 castore(thread, &class);
@@ -353,6 +367,9 @@ pub fn execute_class_method(
             }
             opcode::IF_ACMPNE => {
                 if_acmpne(thread, &class);
+            }
+            opcode::IF_ACMPEQ => {
+                if_acmpeq(thread, &class);
             }
             opcode::I2F => {
                 i2f(thread, &class);
@@ -550,6 +567,7 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
         ("java/lang/Thread", "setPriority0", "(I)V") => {
             java_lang_Thread_setPriority0(thread, class, args)
         }
+        ("java/lang/Thread", "isAlive", "()Z") => java_lang_Thread_isAlive(thread, class, args),
         (class_name, name, descriptor) => {
             panic!(
                 r#"native method: ("{}", "{}", "{}")"#,

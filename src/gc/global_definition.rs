@@ -377,7 +377,7 @@ impl From<JLong> for JValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 #[repr(C)]
 pub enum JValue {
     Boolean(JBoolean),
@@ -452,6 +452,14 @@ impl JValue {
             JValue::Object(o) => o.class_id(),
             _ => unreachable!(),
         }
+    }
+
+    pub fn is_category1(&self) -> bool {
+        !self.is_category2()
+    }
+
+    pub fn is_category2(&self) -> bool {
+        matches!(self, JValue::Double(_) | JValue::Long(_))
     }
 }
 

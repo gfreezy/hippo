@@ -1,6 +1,5 @@
 use crate::gc::global_definition::{
     BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
-    JValue,
 };
 
 pub struct TypeToBasicType<T> {

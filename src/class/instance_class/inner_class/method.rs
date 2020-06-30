@@ -227,7 +227,11 @@ impl fmt::Display for Method {
 
 impl fmt::Debug for Method {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name())
+        write!(f, "{}{}", self.name(), self.descriptor())?;
+        if self.is_static() {
+            write!(f, "-static")?;
+        }
+        Ok(())
     }
 }
 

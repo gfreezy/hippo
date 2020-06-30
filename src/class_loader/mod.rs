@@ -1,11 +1,10 @@
-use crate::class::{alloc_jobject, Class, ClassId, InstanceMirrorClass};
+use crate::class::{Class, ClassId};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 
 use crate::gc::global_definition::JObject;
 
-use crate::java_const::{JAVA_LANG_CLASS, JAVA_LANG_OBJECT};
 use crate::jthread::JvmThread;
-use crate::jvm::{execute_class_method, execute_method};
+use crate::jvm::execute_class_method;
 use nom::lib::std::collections::HashMap;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
@@ -61,8 +60,6 @@ fn get_class_by_name(name: &str) -> Option<Class> {
 }
 
 fn register_class(class: Class, loader: JObject) -> ClassId {
-    println!("register class {}", class.name());
-
     let class_id = {
         let mut g = GLOBAL_CLASSES.inner.write();
         let Inner { classes, map, .. } = &mut *g;
@@ -106,7 +103,6 @@ pub fn load_class(loader: JObject, name: &str) -> Class {
     }
 
     let class = if loader.is_null() {
-        println!("load class {}", name);
         let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstarap_loader");
         boot_loader.load_class(name)
     } else {

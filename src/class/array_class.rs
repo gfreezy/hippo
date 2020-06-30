@@ -1,5 +1,6 @@
-use crate::class::{Class, ClassId};
+use crate::class::{alloc_jobject, Class, InstanceMirrorClass};
 use crate::gc::global_definition::{BasicType, JObject};
+use crossbeam::atomic::AtomicCell;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -12,6 +13,7 @@ struct InnerTypeArrayClass {
     ty: BasicType,
     name: String,
     class_loader: JObject,
+    mirror_class: AtomicCell<JObject>,
 }
 
 impl TypeArrayClass {
@@ -22,6 +24,7 @@ impl TypeArrayClass {
                 ty,
                 name,
                 class_loader: loader,
+                mirror_class: AtomicCell::new(JObject::null()),
             }),
         }
     }
@@ -35,6 +38,17 @@ impl TypeArrayClass {
     pub fn class_loader(&self) -> JObject {
         self.inner.class_loader.clone()
     }
+    pub fn mirror_class(&self) -> JObject {
+        let mirror = self.inner.mirror_class.load();
+        if mirror.is_null() {
+            let mirror_class = InstanceMirrorClass::new(self.name(), self.class_loader());
+            let mirror = alloc_jobject(&mirror_class.into());
+            self.inner.mirror_class.store(mirror);
+            mirror
+        } else {
+            mirror
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -47,6 +61,7 @@ struct InnerObjArrayClass {
     dimension: usize,
     element_class: Class,
     class_loader: JObject,
+    mirror_class: AtomicCell<JObject>,
 }
 impl ObjArrayClass {
     pub fn new(name: String, class: Class, dimension: usize, loader: JObject) -> Self {
@@ -56,6 +71,7 @@ impl ObjArrayClass {
                 name,
                 class_loader: loader,
                 element_class: class,
+                mirror_class: AtomicCell::new(JObject::null()),
             }),
         }
     }
@@ -71,5 +87,16 @@ impl ObjArrayClass {
     }
     pub fn is_inited(&self) -> bool {
         self.element_class().is_inited()
+    }
+    pub fn mirror_class(&self) -> JObject {
+        let mirror = self.inner.mirror_class.load();
+        if mirror.is_null() {
+            let mirror_class = InstanceMirrorClass::new(self.name(), self.class_loader());
+            let mirror = alloc_jobject(&mirror_class.into());
+            self.inner.mirror_class.store(mirror);
+            mirror
+        } else {
+            mirror
+        }
     }
 }

@@ -4,8 +4,6 @@ use crate::gc::global_definition::JObject;
 use crate::gc::mem::align_usize;
 
 use crate::java_const::JAVA_LANG_CLASS;
-use crate::jthread::JvmThread;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct InstanceMirrorClass {
@@ -43,5 +41,23 @@ impl InstanceMirrorClass {
 impl From<InstanceMirrorClass> for Class {
     fn from(cls: InstanceMirrorClass) -> Class {
         Class::InstanceMirrorClass(cls)
+    }
+}
+
+impl From<InstanceMirrorClass> for InstanceClass {
+    fn from(cls: InstanceMirrorClass) -> InstanceClass {
+        cls.class.clone()
+    }
+}
+
+impl From<InstanceClass> for InstanceMirrorClass {
+    fn from(cls: InstanceClass) -> InstanceMirrorClass {
+        let offset = align_usize(cls.instance_size(), 8);
+        InstanceMirrorClass {
+            base_static_offset: offset,
+            class: cls,
+            class_name: JAVA_LANG_CLASS.to_string(),
+        }
+        .into()
     }
 }

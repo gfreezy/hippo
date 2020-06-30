@@ -1,8 +1,9 @@
 #![allow(non_snake_case, unused_variables)]
 
 use crate::class::{alloc_empty_jobject, alloc_jobject, Class};
-use crate::class_loader::{get_class_by_id, load_class};
+use crate::class_loader::{get_class_by_id, init_class, load_class};
 use crate::gc::global_definition::{JObject, JValue};
+use crate::java_const::{JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP};
 use crate::jenv::{get_java_string, new_java_lang_string};
 use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
@@ -184,8 +185,32 @@ pub fn java_security_AccessController_doPrivileged(
 }
 
 pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let t = thread.object.clone();
-    thread.current_frame_mut().operand_stack.push_jobject(t)
+    let mut thread_object = thread.object.clone();
+    if thread_object.is_null() {
+        let thread_group_class = load_class(JObject::null(), JAVA_LANG_THREAD_GROUP);
+        init_class(thread, &thread_group_class);
+        let thread_group_object = alloc_jobject(&thread_group_class);
+        let default_init = thread_group_class
+            .get_self_method("<init>", "()V", false)
+            .expect("no init found");
+        execute_method(thread, default_init, vec![thread_group_object.into()]);
+
+        let thread_class = load_class(JObject::null(), JAVA_LANG_THREAD);
+        init_class(thread, &thread_class);
+        thread_object = alloc_jobject(&thread_class);
+        let field = thread_class
+            .get_field("group", "Ljava/lang/ThreadGroup;")
+            .unwrap();
+        thread_object.set_field_by_offset(field.offset(), thread_group_object);
+        let field = thread_class.get_field("priority", "I").unwrap();
+        thread_object.set_field_by_offset(field.offset(), 1);
+
+        thread.set_thread_object(thread_object);
+    }
+    thread
+        .current_frame_mut()
+        .operand_stack
+        .push_jobject(thread_object)
 }
 
 pub fn java_lang_Class_getName0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
@@ -196,7 +221,6 @@ pub fn java_lang_Class_getName0(thread: &mut JvmThread, class: &Class, args: Vec
 pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
     let name = get_java_string(args[0].as_jobject());
     let class_name = name.replace('.', "/");
-    eprintln!("class_for_Name0: {}", &class_name);
     let class = load_class(class.class_loader(), &class_name);
     thread
         .current_frame_mut()
@@ -216,6 +240,18 @@ pub fn java_security_AccessController_getStackAccessControlContext(
 }
 
 pub fn java_lang_Thread_setPriority0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let priority = args[1].as_jint();
+    if priority < 1 {
+        let object_ref = args[0].as_jobject();
+        let class_id = object_ref.class_id();
+        let class = get_class_by_id(class_id);
+        let field = class.get_field("priority", "I").unwrap();
+        object_ref.set_field_by_offset(field.offset(), 5);
+    }
+}
+
+// todo: continue here
+pub fn java_lang_Thread_isAlive(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
     let priority = args[1].as_jint();
     if priority < 1 {
         let object_ref = args[0].as_jobject();

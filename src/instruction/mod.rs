@@ -247,10 +247,18 @@ pub fn freturn(thread: &mut JvmThread, class: &Class) {
 
 pub fn areturn(thread: &mut JvmThread, class: &Class) {
     let frame = thread.current_frame_mut();
-    let val = frame.operand_stack.pop();
+    let val = frame.operand_stack.pop_jobject();
     thread.pop_frame();
     let last_frame = thread.current_frame_mut();
-    last_frame.operand_stack.push(val);
+    last_frame.operand_stack.push_jobject(val);
+}
+
+pub fn lreturn(thread: &mut JvmThread, class: &Class) {
+    let frame = thread.current_frame_mut();
+    let val = frame.operand_stack.pop_jlong();
+    thread.pop_frame();
+    let last_frame = thread.current_frame_mut();
+    last_frame.operand_stack.push_jlong(val);
 }
 
 pub fn return_(thread: &mut JvmThread, class: &Class) {
@@ -512,7 +520,7 @@ pub fn checkcast(thread: &mut JvmThread, class: &Class) {
     let class_id = obj_ref.class_id();
     let obj_class = get_class_by_id(class_id);
 
-    assert!(can_cast_to(thread, dbg!(obj_class), dbg!(class)));
+    assert!(can_cast_to(thread, obj_class, class));
 
     let frame = thread.current_frame_mut();
     frame.operand_stack.push(obj_ref);
@@ -523,6 +531,22 @@ pub fn dup(thread: &mut JvmThread, class: &Class) {
     let val = frame.operand_stack.pop();
     frame.operand_stack.push(val.clone());
     frame.operand_stack.push(val);
+}
+
+pub fn dup2(thread: &mut JvmThread, class: &Class) {
+    let frame = thread.current_frame_mut();
+    let val1 = frame.operand_stack.pop();
+    if val1.is_category1() {
+        let val2 = frame.operand_stack.pop();
+        assert!(val2.is_category1());
+        frame.operand_stack.push(val2);
+        frame.operand_stack.push(val1);
+        frame.operand_stack.push(val2);
+        frame.operand_stack.push(val1);
+    } else {
+        frame.operand_stack.push(val1);
+        frame.operand_stack.push(val1);
+    }
 }
 
 pub fn dup_x1(thread: &mut JvmThread, class: &Class) {

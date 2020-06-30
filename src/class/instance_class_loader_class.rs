@@ -1,5 +1,4 @@
 use crate::class::{Class, InstanceClass};
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct InstanceClassLoaderClass {

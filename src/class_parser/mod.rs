@@ -10,7 +10,8 @@ use crate::class_parser::constant_pool::{parse_const_pool_info, ConstPool, Const
 use crate::class_parser::field_info::{parse_field_info, FieldInfo};
 use crate::class_parser::method_info::{parse_method_info, MethodInfo};
 use crate::class_parser::nom_utils::length_many;
-use anyhow::{ensure, Result};
+use color_eyre::Result;
+use eyre::ensure;
 use nom::bytes::complete::tag;
 use nom::eof;
 use nom::number::complete::be_u16;

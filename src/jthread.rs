@@ -25,6 +25,10 @@ impl JvmThread {
         }
     }
 
+    pub fn set_thread_object(&mut self, thread: JObject) {
+        self.object = thread;
+    }
+
     pub fn current_frame_mut(&mut self) -> &mut JvmFrame {
         self.stack.frames.back_mut().unwrap()
     }

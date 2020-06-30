@@ -1,4 +1,3 @@
-use anyhow::Context;
 use std::env;
 use std::fs::read_dir;
 use std::fs::File;
@@ -25,8 +24,7 @@ impl Entry {
             let base_path = &path[..len - 1];
             trace!(base_path);
             let path_vec: Vec<PathBuf> = read_dir(base_path)
-                .with_context(|| format!("read_dir: {}", base_path))
-                .unwrap()
+                .unwrap_or_else(|_| panic!("read_dir: {}", base_path))
                 .map(|x| x.unwrap())
                 .map(|x| x.path())
                 .filter(|x| {

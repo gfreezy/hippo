@@ -1,9 +1,23 @@
-use crate::gc::global_definition::{JValue};
+use crate::gc::global_definition::JValue;
+use nom::lib::std::fmt::Formatter;
+use std::fmt;
 
-
-#[derive(Debug)]
 pub struct LocalVariableArray {
     local_variables: Vec<JValue>,
+}
+
+impl fmt::Debug for LocalVariableArray {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "LocalVariableArray {{ ")?;
+        for (i, local_variable) in self.local_variables.iter().enumerate() {
+            write!(f, "{}: {:?}", i, local_variable)?;
+            if i != self.local_variables.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, "}}")?;
+        Ok(())
+    }
 }
 
 impl LocalVariableArray {

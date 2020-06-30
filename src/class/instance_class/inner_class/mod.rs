@@ -20,8 +20,6 @@ use nom::lib::std::collections::HashMap;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use crate::java_const::JAVA_LANG_CLASS;
-use crate::jthread::JvmThread;
 use crossbeam::atomic::AtomicCell;
 use std::sync::atomic::Ordering::SeqCst;
 use tracing::trace;
@@ -136,10 +134,6 @@ impl InnerClass {
         } else {
             self.mirror_class.load()
         }
-    }
-
-    pub fn set_mirror_class(&self, mirror: JObject) {
-        self.mirror_class.store(mirror);
     }
 
     pub fn instance_size(&self) -> usize {
@@ -395,7 +389,6 @@ impl Iterator for SuperClassesIter {
 }
 
 fn get_default_value_from_field_info(
-    thread: &mut JvmThread,
     field_info: &FieldInfo,
     const_pool: &ConstPool,
 ) -> Option<JValue> {
