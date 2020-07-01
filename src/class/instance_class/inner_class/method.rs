@@ -4,8 +4,8 @@ use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::descriptor::method_descriptor;
 use crate::class_parser::method_info::MethodInfo;
 use crate::class_parser::{
-    is_bit_set, ACC_ABSTRACT, ACC_FINAL, ACC_NATIVE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC,
-    ACC_STATIC, ACC_VARARGS,
+    is_bit_set, JVM_ACC_ABSTRACT, JVM_ACC_FINAL, JVM_ACC_NATIVE, JVM_ACC_PRIVATE,
+    JVM_ACC_PROTECTED, JVM_ACC_PUBLIC, JVM_ACC_STATIC, JVM_ACC_VARARGS,
 };
 use crate::gc::global_definition::{BasicType, JObject};
 
@@ -65,7 +65,7 @@ impl Method {
             vec![]
         };
 
-        if is_bit_set(access_flags, ACC_NATIVE) || is_bit_set(access_flags, ACC_ABSTRACT) {
+        if is_bit_set(access_flags, JVM_ACC_NATIVE) || is_bit_set(access_flags, JVM_ACC_ABSTRACT) {
             Method {
                 inner: Arc::new(InnerMethod {
                     access_flags,
@@ -181,29 +181,29 @@ impl Method {
     }
 
     pub fn is_static(&self) -> bool {
-        self.access_flags() & ACC_STATIC != 0
+        self.access_flags() & JVM_ACC_STATIC != 0
     }
 
     pub fn is_native(&self) -> bool {
-        self.access_flags() & ACC_NATIVE != 0
+        self.access_flags() & JVM_ACC_NATIVE != 0
     }
 
     pub fn is_public(&self) -> bool {
-        self.access_flags() & ACC_PUBLIC != 0
+        self.access_flags() & JVM_ACC_PUBLIC != 0
     }
 
     pub fn is_private(&self) -> bool {
-        self.access_flags() & ACC_PRIVATE != 0
+        self.access_flags() & JVM_ACC_PRIVATE != 0
     }
 
     pub fn is_protected(&self) -> bool {
-        self.access_flags() & ACC_PROTECTED != 0
+        self.access_flags() & JVM_ACC_PROTECTED != 0
     }
     pub fn is_final(&self) -> bool {
-        self.access_flags() & ACC_FINAL != 0
+        self.access_flags() & JVM_ACC_FINAL != 0
     }
     pub fn is_abstract(&self) -> bool {
-        self.access_flags() & ACC_ABSTRACT != 0
+        self.access_flags() & JVM_ACC_ABSTRACT != 0
     }
     pub fn is_signature_polymorphic(&self) -> bool {
         self.inner.class_name == "java/lang/invoke/MethodHandle"
@@ -214,8 +214,8 @@ impl Method {
                 .collect::<Vec<_>>()
                 == vec!["[java/lang/Object;"]
             && self.descriptor().split(')').last() == Some("java/lang/Object")
-            && is_bit_set(self.access_flags(), ACC_VARARGS)
-            && is_bit_set(self.access_flags(), ACC_NATIVE)
+            && is_bit_set(self.access_flags(), JVM_ACC_VARARGS)
+            && is_bit_set(self.access_flags(), JVM_ACC_NATIVE)
     }
 }
 

@@ -6,8 +6,8 @@ use crate::class::{alloc_jobject, Class, InstanceMirrorClass};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
-    ClassFile, ACC_FINAL, ACC_INTERFACE, ACC_PRIVATE, ACC_PROTECTED, ACC_PUBLIC, ACC_STATIC,
-    ACC_SUPER,
+    ClassFile, JVM_ACC_FINAL, JVM_ACC_INTERFACE, JVM_ACC_PRIVATE, JVM_ACC_PROTECTED,
+    JVM_ACC_PUBLIC, JVM_ACC_STATIC, JVM_ACC_SUPER,
 };
 use crate::gc::global_definition::{JObject, JValue};
 use crate::gc::mem::align_usize;
@@ -74,30 +74,30 @@ impl InnerClass {
         let mut static_offset = 0;
         let mut instance_fields = HashMap::new();
         let mut static_fields = HashMap::new();
-        for (name, descriptor, size, field_info) in fields {
+        for (field_name, descriptor, size, field_info) in fields {
             if field_info.is_static() {
                 static_offset = align_usize(static_offset, size);
                 let f = Field::new(
-                    name,
+                    field_name,
                     descriptor,
                     field_info.access_flags,
                     size,
                     static_offset,
                     loader,
                 );
-                static_fields.insert(f.name(), f.clone());
+                static_fields.insert(f.name().to_string(), f.clone());
                 static_offset += f.size();
             } else {
                 instance_offset = align_usize(instance_offset, size);
                 let f = Field::new(
-                    name,
+                    field_name,
                     descriptor,
                     field_info.access_flags,
                     size,
                     instance_offset,
                     loader,
                 );
-                instance_fields.insert(f.name(), f.clone());
+                instance_fields.insert(f.name().to_string(), f.clone());
                 instance_offset += f.size();
             }
         }
@@ -149,34 +149,34 @@ impl InnerClass {
     }
 
     pub fn is_interface(&self) -> bool {
-        self.access_flags() & ACC_INTERFACE != 0
+        self.access_flags() & JVM_ACC_INTERFACE != 0
     }
 
     pub fn is_class(&self) -> bool {
-        self.access_flags() & ACC_INTERFACE == 0
+        self.access_flags() & JVM_ACC_INTERFACE == 0
     }
 
     pub fn is_static(&self) -> bool {
-        self.access_flags() & ACC_STATIC != 0
+        self.access_flags() & JVM_ACC_STATIC != 0
     }
 
     pub fn is_super(&self) -> bool {
-        self.access_flags() & ACC_SUPER != 0
+        self.access_flags() & JVM_ACC_SUPER != 0
     }
 
     pub fn is_public(&self) -> bool {
-        self.access_flags() & ACC_PUBLIC != 0
+        self.access_flags() & JVM_ACC_PUBLIC != 0
     }
 
     pub fn is_private(&self) -> bool {
-        self.access_flags() & ACC_PRIVATE != 0
+        self.access_flags() & JVM_ACC_PRIVATE != 0
     }
 
     pub fn is_protected(&self) -> bool {
-        self.access_flags() & ACC_PROTECTED != 0
+        self.access_flags() & JVM_ACC_PROTECTED != 0
     }
     pub fn is_final(&self) -> bool {
-        self.access_flags() & ACC_FINAL != 0
+        self.access_flags() & JVM_ACC_FINAL != 0
     }
 
     pub fn constant_pool(&self) -> &ConstPool {
@@ -201,6 +201,12 @@ impl InnerClass {
 
     pub fn static_fields(&self) -> &HashMap<String, Field> {
         &self.static_fields
+    }
+
+    pub fn iter_fields(&self) -> impl Iterator<Item = &Field> {
+        self.instance_fields
+            .values()
+            .chain(self.static_fields.values())
     }
 
     pub fn total_self_instance_fields(&self) -> usize {

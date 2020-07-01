@@ -447,7 +447,7 @@ pub fn new(thread: &mut JvmThread, class: &Class) {
     let class_name = class.constant_pool().get_class_name_at(index);
     let class = load_class(class.class_loader(), class_name);
     init_class(thread, &class);
-    let jobject = new_jobject(class);
+    let jobject = new_jobject(&class);
     let frame = thread.current_frame_mut();
     frame.operand_stack.push_jobject(jobject)
 }

@@ -20,7 +20,7 @@ use crate::gc::global_definition::{
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::alloc_tlab;
 
-use nom::lib::std::collections::HashMap;
+use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Clone)]
@@ -256,6 +256,16 @@ impl Class {
             Class::InstanceClass(c) => c.static_fields(),
             Class::InstanceClassLoaderClass(c) => c.static_fields(),
             Class::InstanceMirrorClass(c) => c.static_fields(),
+            Class::TypeArrayClass(_) => unreachable!(),
+            Class::ObjArrayClass(_) => unreachable!(),
+        }
+    }
+
+    pub fn iter_fields<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Field> + 'a> {
+        match self {
+            Class::InstanceClass(c) => Box::new(c.iter_fields()),
+            Class::InstanceClassLoaderClass(c) => Box::new(c.iter_fields()),
+            Class::InstanceMirrorClass(c) => Box::new(c.iter_fields()),
             Class::TypeArrayClass(_) => unreachable!(),
             Class::ObjArrayClass(_) => unreachable!(),
         }

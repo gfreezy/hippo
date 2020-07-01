@@ -1,11 +1,16 @@
 #![allow(non_snake_case, unused_variables)]
 
-use crate::class::{alloc_empty_jobject, alloc_jobject, Class};
+use crate::class::{alloc_empty_jobject, alloc_jarray, alloc_jobject, Class};
 use crate::class_loader::{get_class_by_id, init_class, load_class};
-use crate::gc::global_definition::{JLong, JObject, JValue};
-use crate::java_const::{JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP};
+use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
+use crate::gc::global_definition::{JInt, JLong, JObject, JValue};
+use crate::java_const::{
+    class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_REFLECT_FIELD, JAVA_LANG_THREAD,
+    JAVA_LANG_THREAD_GROUP,
+};
 use crate::jenv::{
-    get_java_string, get_object_field, new_java_lang_string, set_object_field, JTHREAD, THREADS,
+    get_java_class_object, get_java_string, get_object_field, new_java_lang_string, new_jobject,
+    new_jobject_array, set_object_field, JTHREAD, THREADS,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
@@ -39,20 +44,49 @@ pub fn java_lang_Class_getDeclaredFields0(
     class: &Class,
     args: Vec<JValue>,
 ) {
-    // todo: fixup
     let obj = args[0].as_jobject();
     let public_only = args[1].as_jbool();
     let class = get_class_by_id(obj.class_id());
 
-    let num_fields = if public_only {
-        class
-            .instance_fields()
-            .values()
-            .filter(|f| f.is_public())
-            .count()
+    let fields: Vec<_> = if public_only {
+        class.iter_fields().filter(|f| f.is_public()).collect()
     } else {
-        class.instance_fields().len()
+        class.iter_fields().collect()
     };
+    let reflect_field_class = load_class(class.class_loader(), JAVA_LANG_REFLECT_FIELD);
+    init_class(thread, &reflect_field_class);
+    let obj_array = new_jobject_array(reflect_field_class.clone(), fields.len());
+
+    for (i, f) in fields.iter().enumerate() {
+        let field_obj = new_jobject(&reflect_field_class);
+        set_object_field(
+            field_obj,
+            "clazz",
+            &class_name_to_descriptor(JAVA_LANG_CLASS),
+            class.mirror_class(),
+        );
+        set_object_field(field_obj, "slot", "I", i as JInt);
+        set_object_field(field_obj, "name", "String", new_java_lang_string(f.name()));
+        let field_type = get_java_class_object(thread, class.class_loader(), f.type_class());
+        set_object_field(
+            field_obj,
+            "type",
+            &class_name_to_descriptor(JAVA_LANG_CLASS),
+            field_type,
+        );
+        set_object_field(
+            field_obj,
+            "modifiers",
+            "I",
+            f.access_flags() & JVM_RECOGNIZED_FIELD_MODIFIERS,
+        );
+        set_object_field(field_obj, "override", "Z", 0u8);
+        // todo: generic signature
+        // todo: annotation
+
+        obj_array.set(i, field_obj);
+    }
+    thread.push_jarray(obj_array);
 }
 
 pub fn jvm_desiredAssertionStatus0(thread: &mut JvmThread, _class: &Class, _args: Vec<JValue>) {

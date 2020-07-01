@@ -19,24 +19,35 @@ use nom::IResult;
 
 pub const MAGIC_NUMBER: u32 = 0xCAFE_BABE;
 
-pub const ACC_PUBLIC: u16 = 0x0001;
-pub const ACC_PRIVATE: u16 = 0x0002;
-pub const ACC_PROTECTED: u16 = 0x0004;
-pub const ACC_STATIC: u16 = 0x0008;
-pub const ACC_FINAL: u16 = 0x0010;
-pub const ACC_SYNCHRONIZED: u16 = 0x0020;
-pub const ACC_SUPER: u16 = 0x0020;
-pub const ACC_BRIDGE: u16 = 0x0040;
-pub const ACC_VOLATILE: u16 = 0x0040;
-pub const ACC_VARARGS: u16 = 0x0080;
-pub const ACC_TRANSIENT: u16 = 0x0080;
-pub const ACC_NATIVE: u16 = 0x0100;
-pub const ACC_INTERFACE: u16 = 0x0200;
-pub const ACC_ABSTRACT: u16 = 0x0400;
-pub const ACC_STRICT: u16 = 0x0800;
-pub const ACC_SYNTHETIC: u16 = 0x1000;
-pub const ACC_ANNOTATION: u16 = 0x2000;
-pub const ACC_ENUM: u16 = 0x4000;
+pub const JVM_ACC_PUBLIC: u16 = 0x0001;
+pub const JVM_ACC_PRIVATE: u16 = 0x0002;
+pub const JVM_ACC_PROTECTED: u16 = 0x0004;
+pub const JVM_ACC_STATIC: u16 = 0x0008;
+pub const JVM_ACC_FINAL: u16 = 0x0010;
+pub const JVM_ACC_SYNCHRONIZED: u16 = 0x0020;
+pub const JVM_ACC_SUPER: u16 = 0x0020;
+pub const JVM_ACC_BRIDGE: u16 = 0x0040;
+pub const JVM_ACC_VOLATILE: u16 = 0x0040;
+pub const JVM_ACC_VARARGS: u16 = 0x0080;
+pub const JVM_ACC_TRANSIENT: u16 = 0x0080;
+pub const JVM_ACC_NATIVE: u16 = 0x0100;
+pub const JVM_ACC_INTERFACE: u16 = 0x0200;
+pub const JVM_ACC_ABSTRACT: u16 = 0x0400;
+pub const JVM_ACC_STRICT: u16 = 0x0800;
+pub const JVM_ACC_SYNTHETIC: u16 = 0x1000;
+pub const JVM_ACC_ANNOTATION: u16 = 0x2000;
+pub const JVM_ACC_ENUM: u16 = 0x4000;
+pub const JVM_ACC_MODULE: u16 = 0x8000;
+
+pub const JVM_RECOGNIZED_FIELD_MODIFIERS: u16 = (JVM_ACC_PUBLIC
+    | JVM_ACC_PRIVATE
+    | JVM_ACC_PROTECTED
+    | JVM_ACC_STATIC
+    | JVM_ACC_FINAL
+    | JVM_ACC_VOLATILE
+    | JVM_ACC_TRANSIENT
+    | JVM_ACC_ENUM
+    | JVM_ACC_SYNTHETIC);
 
 #[derive(Debug)]
 pub struct ClassFile {
@@ -95,21 +106,25 @@ impl ClassFile {
 
     fn validate_access_flags(&self) -> Result<()> {
         let access_flags = self.access_flags;
-        if is_bit_set(access_flags, ACC_INTERFACE) {
+        if is_bit_set(access_flags, JVM_ACC_INTERFACE) {
             ensure!(
-                is_bit_set(access_flags, ACC_ABSTRACT),
+                is_bit_set(access_flags, JVM_ACC_ABSTRACT),
                 "ACC_ABSTRACT is set"
             );
             ensure!(
-                is_bit_clear(access_flags, ACC_FINAL)
-                    && is_bit_clear(access_flags, ACC_SUPER)
-                    && is_bit_clear(access_flags, ACC_ENUM),
+                is_bit_clear(access_flags, JVM_ACC_FINAL)
+                    && is_bit_clear(access_flags, JVM_ACC_SUPER)
+                    && is_bit_clear(access_flags, JVM_ACC_ENUM),
                 "access flags"
             );
         } else {
-            ensure!(is_bit_clear(access_flags, ACC_ANNOTATION), "access flags");
             ensure!(
-                !(is_bit_set(access_flags, ACC_FINAL) && is_bit_set(access_flags, ACC_ABSTRACT)),
+                is_bit_clear(access_flags, JVM_ACC_ANNOTATION),
+                "access flags"
+            );
+            ensure!(
+                !(is_bit_set(access_flags, JVM_ACC_FINAL)
+                    && is_bit_set(access_flags, JVM_ACC_ABSTRACT)),
                 "access flags"
             );
         }

@@ -4,7 +4,7 @@ use crate::class_parser::attribute_info::predefined_attribute::{
 use crate::class_parser::attribute_info::{parse_attribute_info, AttributeInfo};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::nom_utils::length_many;
-use crate::class_parser::{ACC_FINAL, ACC_STATIC};
+use crate::class_parser::{JVM_ACC_FINAL, JVM_ACC_STATIC};
 use nom::number::complete::be_u16;
 use nom::IResult;
 
@@ -45,10 +45,10 @@ impl FieldInfo {
     }
 
     pub fn is_static(&self) -> bool {
-        self.access_flags & ACC_STATIC != 0
+        self.access_flags & JVM_ACC_STATIC != 0
     }
 
     pub fn is_final(&self) -> bool {
-        self.access_flags & ACC_FINAL != 0
+        self.access_flags & JVM_ACC_FINAL != 0
     }
 }

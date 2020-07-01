@@ -1,5 +1,5 @@
 use crate::class::{alloc_jarray, alloc_jobject, Class, Method};
-use crate::class_loader::{get_class_by_id, get_class_id_by_name, load_class};
+use crate::class_loader::{get_class_by_id, get_class_id_by_name, init_class, load_class};
 
 use crate::gc::global_definition::{BasicType, JArray, JObject};
 
@@ -17,7 +17,7 @@ thread_local! {
 
 pub static THREADS: OnceCell<Mutex<HashSet<i64>>> = OnceCell::new();
 
-pub fn new_jobject(class: Class) -> JObject {
+pub fn new_jobject(class: &Class) -> JObject {
     alloc_jobject(&class)
 }
 
@@ -31,6 +31,12 @@ pub fn new_jobject_array(class: Class, len: usize) -> JArray {
     let array_class = load_class(JObject::null(), &format!("[L{};", class.name()));
     let class_id = get_class_id_by_name(array_class.name());
     alloc_jarray(BasicType::Object, class_id, len)
+}
+
+pub fn get_java_class_object(thread: &mut JvmThread, loader: JObject, name: &str) -> JObject {
+    let class = load_class(loader, name);
+    init_class(thread, &class);
+    class.mirror_class()
 }
 
 pub fn new_java_lang_string(s: &str) -> JObject {

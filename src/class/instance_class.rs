@@ -92,6 +92,10 @@ macro_rules! impl_instance_class {
                 self.class.static_fields()
             }
 
+            pub fn iter_fields(&self) -> impl Iterator<Item = &crate::class::Field> {
+                self.class.iter_fields()
+            }
+
             pub fn methods(&self) -> &[crate::class::Method] {
                 self.class.methods()
             }

@@ -1,5 +1,8 @@
-use crate::class_parser::{ACC_FINAL, ACC_PUBLIC, ACC_STATIC};
+use crate::class::alloc_jobject;
+use crate::class_loader::load_class;
+use crate::class_parser::{JVM_ACC_FINAL, JVM_ACC_PUBLIC, JVM_ACC_STATIC};
 use crate::gc::global_definition::{BasicType, JObject, JValue};
+use crate::java_const::JAVA_LANG_REFLECT_FIELD;
 
 #[derive(Debug, Clone)]
 pub struct Field {
@@ -34,16 +37,20 @@ impl Field {
         self.access_flags
     }
 
-    pub fn descriptor(&self) -> String {
-        self.descriptor.clone()
+    pub fn descriptor(&self) -> &str {
+        &self.descriptor
+    }
+
+    pub fn type_class(&self) -> &str {
+        &self.descriptor[1..self.descriptor.len() - 1]
     }
 
     pub fn basic_type(&self) -> BasicType {
         self.descriptor.as_str().into()
     }
 
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn size(&self) -> usize {
@@ -68,15 +75,15 @@ impl Field {
     }
 
     pub fn is_static(&self) -> bool {
-        self.access_flags() & ACC_STATIC != 0
+        self.access_flags() & JVM_ACC_STATIC != 0
     }
 
     pub fn is_public(&self) -> bool {
-        self.access_flags() & ACC_PUBLIC != 0
+        self.access_flags() & JVM_ACC_PUBLIC != 0
     }
 
     pub fn is_final(&self) -> bool {
-        self.access_flags() & ACC_FINAL != 0
+        self.access_flags() & JVM_ACC_FINAL != 0
     }
 
     pub fn default_value(&self) -> JValue {
