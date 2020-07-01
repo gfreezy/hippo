@@ -5,8 +5,8 @@ use crate::class_loader::{get_class_by_id, init_class, load_class};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
 use crate::gc::global_definition::{JInt, JLong, JObject, JValue};
 use crate::java_const::{
-    class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_REFLECT_FIELD, JAVA_LANG_THREAD,
-    JAVA_LANG_THREAD_GROUP,
+    class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_REFLECT_FIELD, JAVA_LANG_STRING,
+    JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP,
 };
 use crate::jenv::{
     get_java_class_object, get_java_string, get_object_field, new_java_lang_string, new_jobject,
@@ -66,8 +66,13 @@ pub fn java_lang_Class_getDeclaredFields0(
             class.mirror_class(),
         );
         set_object_field(field_obj, "slot", "I", i as JInt);
-        set_object_field(field_obj, "name", "String", new_java_lang_string(f.name()));
-        let field_type = get_java_class_object(thread, class.class_loader(), f.type_class());
+        set_object_field(
+            field_obj,
+            "name",
+            &class_name_to_descriptor(JAVA_LANG_STRING),
+            new_java_lang_string(f.name()),
+        );
+        let field_type = get_java_class_object(thread, class.class_loader(), f.descriptor());
         set_object_field(
             field_obj,
             "type",
@@ -339,4 +344,12 @@ pub fn java_lang_Thread_start0(thread: &mut JvmThread, class: &Class, args: Vec<
         let thread_id = thread_id::get() as i64;
         THREADS.get().unwrap().lock().remove(&thread_id);
     });
+}
+
+pub fn java_misc_Unsafe_compareAndSwapObject(
+    thread: &mut JvmThread,
+    class: &Class,
+    args: Vec<JValue>,
+) {
+    // todo: here
 }

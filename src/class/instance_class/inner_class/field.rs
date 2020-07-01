@@ -41,10 +41,6 @@ impl Field {
         &self.descriptor
     }
 
-    pub fn type_class(&self) -> &str {
-        &self.descriptor[1..self.descriptor.len() - 1]
-    }
-
     pub fn basic_type(&self) -> BasicType {
         self.descriptor.as_str().into()
     }

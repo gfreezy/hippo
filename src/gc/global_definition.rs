@@ -416,7 +416,8 @@ impl JValue {
     pub fn as_jbool(&self) -> bool {
         match self {
             JValue::Boolean(b) => *b == 1,
-            _ => unreachable!(),
+            JValue::Int(b) => *b == 1,
+            v => unreachable!("{:?}", v),
         }
     }
 

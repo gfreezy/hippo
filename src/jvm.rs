@@ -591,6 +591,13 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
         ("java/lang/Class", "getDeclaredFields0", "(Z)[Ljava/lang/reflect/Field;") => {
             java_lang_Class_getDeclaredFields0(thread, class, args);
         }
+        (
+            "sun/misc/Unsafe",
+            "compareAndSwapObject",
+            "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z",
+        ) => {
+            java_misc_Unsafe_compareAndSwapObject(thread, class, args);
+        }
         (class_name, name, descriptor) => {
             panic!(
                 r#"native method: ("{}", "{}", "{}")"#,
