@@ -1,8 +1,6 @@
 use crate::class::ClassId;
 use crate::gc::address::Address;
-use crate::gc::global_definition::type_to_basic_type::{
-    size_of_java_type, type_to_basic_type, TypeToBasicType,
-};
+use crate::gc::global_definition::type_to_basic_type::{size_of_java_type, TypeToBasicType};
 use crate::gc::global_definition::{BasicType, HEAP_WORD_SIZE};
 use crate::gc::mark_word::MarkWord;
 use crate::gc::mem::{align_usize, is_aligned};
@@ -21,10 +19,6 @@ impl OopDesc {
         size_of::<OopDesc>() / HEAP_WORD_SIZE
     }
 
-    pub fn size(&self) -> usize {
-        unimplemented!()
-    }
-
     pub fn is_instance(&self) -> bool {
         unimplemented!()
     }
@@ -38,6 +32,9 @@ impl OopDesc {
     }
 
     pub fn is_type_array(&self) -> bool {
+        unimplemented!()
+    }
+    pub fn basic_type(&self) -> BasicType {
         unimplemented!()
     }
 
@@ -117,11 +114,11 @@ impl ArrayOopDesc {
         size_of::<ArrayOopDesc>()
     }
 
-    pub fn base_offset_in_bytes(_ty: BasicType) -> usize {
+    pub fn base_offset_in_bytes() -> usize {
         Self::header_size_in_bytes()
     }
 
-    pub fn header_size(_ty: BasicType) -> usize {
+    pub fn header_size() -> usize {
         let type_size_in_bytes = Self::header_size_in_bytes();
         type_size_in_bytes / HEAP_WORD_SIZE
     }
@@ -150,7 +147,7 @@ impl ArrayOopDesc {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
+        let data_offset = ArrayOopDesc::base_offset_in_bytes();
         unsafe {
             let self_offset: *const T = transmute(self);
             assert!(is_aligned(data_offset, size_of::<T>()));
@@ -163,7 +160,7 @@ impl ArrayOopDesc {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
+        let data_offset = ArrayOopDesc::base_offset_in_bytes();
         unsafe {
             let self_offset: *mut T = transmute(self);
             assert!(is_aligned(data_offset, size_of::<T>()));
@@ -177,7 +174,7 @@ impl ArrayOopDesc {
         TypeToBasicType<T>: Into<BasicType>,
     {
         assert_eq!(src.len(), self.len());
-        let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
+        let data_offset = ArrayOopDesc::base_offset_in_bytes();
         assert!(is_aligned(data_offset, size_of::<T>()));
 
         unsafe {
@@ -191,7 +188,7 @@ impl ArrayOopDesc {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
+        let data_offset = ArrayOopDesc::base_offset_in_bytes();
         unsafe {
             let self_offset: *const T = transmute(self);
             let offset = data_offset + size_of_java_type::<T>(None) * index;
@@ -205,7 +202,7 @@ impl ArrayOopDesc {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        let data_offset = ArrayOopDesc::base_offset_in_bytes(type_to_basic_type::<T>(None));
+        let data_offset = ArrayOopDesc::base_offset_in_bytes();
         unsafe {
             let self_offset: *mut T = transmute(self);
             let offset = data_offset + size_of_java_type::<T>(None) * index;
@@ -221,6 +218,11 @@ impl ArrayOopDesc {
     {
         let header_size = ArrayOopDesc::header_size_in_bytes();
         header_size + size_of_java_type::<T>(None) * len
+    }
+
+    pub fn array_size_in_bytes_with_basic_type(ty: BasicType, len: usize) -> usize {
+        let header_size = ArrayOopDesc::header_size_in_bytes();
+        header_size + ty.size_in_bytes() * len
     }
 }
 

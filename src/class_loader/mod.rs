@@ -14,6 +14,7 @@ struct GlobalClasses {
     inner: RwLock<Inner>,
 }
 
+#[derive(Debug)]
 struct Inner {
     classes: Vec<Class>,
     defining_classes: Vec<ClassId>,
@@ -41,9 +42,10 @@ lazy_static::lazy_static! {
 pub static BOOTSTRAP_LOADER: OnceCell<BootstrapClassLoader> = OnceCell::new();
 
 pub fn get_class_by_id(id: ClassId) -> Class {
+    assert!(id > 0);
     let g = GLOBAL_CLASSES.inner.read();
     g.classes
-        .get(id as usize)
+        .get(id as usize - 1)
         .unwrap_or_else(|| panic!("get class by id: {}", id))
         .clone()
 }
@@ -56,10 +58,11 @@ pub fn get_class_id_by_name(name: &str) -> ClassId {
 fn get_class_by_name(name: &str) -> Option<Class> {
     let g = GLOBAL_CLASSES.inner.read();
     let id = g.map.get(name)?;
-    Some(g.classes.get(*id)?.clone())
+    assert!(*id > 0);
+    Some(g.classes.get(*id - 1)?.clone())
 }
 
-fn register_class(class: Class, loader: JObject) -> ClassId {
+fn register_class(class: Class, _loader: JObject) -> ClassId {
     let class_id = {
         let mut g = GLOBAL_CLASSES.inner.write();
         let Inner { classes, map, .. } = &mut *g;
@@ -67,7 +70,7 @@ fn register_class(class: Class, loader: JObject) -> ClassId {
         if let Entry::Occupied(occupied) = entry {
             return *occupied.get();
         }
-        let class_id = classes.len();
+        let class_id = classes.len() + 1;
         classes.push(class.clone());
         entry.or_insert(class_id);
         class_id
@@ -96,12 +99,12 @@ pub fn init_class(thread: &mut JvmThread, class: &Class) {
     }
 }
 
-pub fn load_class(loader: JObject, name: &str) -> Class {
+pub fn load_class(loader: JObject, mut name: &str) -> Class {
+    name = name.trim_start_matches('L').trim_end_matches(';');
     if let Some(class) = get_class_by_name(name) {
         assert_eq!(class.class_loader(), loader);
         return class;
     }
-
     let class = if loader.is_null() {
         let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstarap_loader");
         boot_loader.load_class(name)

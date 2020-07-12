@@ -2,7 +2,7 @@ pub mod cp_cache;
 pub mod field;
 pub mod method;
 
-use crate::class::{alloc_jobject, Class, InstanceMirrorClass};
+use crate::class::{Class, InstanceMirrorClass};
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
@@ -14,7 +14,7 @@ use crate::gc::mem::align_usize;
 use field::descriptor_size_in_bytes;
 use method::Method;
 
-use crate::jenv::new_java_lang_string;
+use crate::jenv::{alloc_jobject, new_java_lang_string};
 use field::Field;
 use nom::lib::std::collections::HashMap;
 
@@ -381,6 +381,12 @@ impl InnerClass {
 }
 
 pub struct SuperClassesIter(Option<Class>);
+
+impl SuperClassesIter {
+    pub fn new(class: Option<Class>) -> Self {
+        SuperClassesIter(class)
+    }
+}
 
 impl Iterator for SuperClassesIter {
     type Item = Class;

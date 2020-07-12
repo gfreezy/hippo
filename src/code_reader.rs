@@ -29,6 +29,18 @@ impl CodeReader {
         Some(byte1 << 8 | byte2)
     }
 
+    pub fn read_i32(&mut self) -> Option<i32> {
+        let byte1 = *self.code.get(self.pc as usize)? as i32;
+        self.pc += 1;
+        let byte2 = *self.code.get(self.pc as usize)? as i32;
+        self.pc += 1;
+        let byte3 = *self.code.get(self.pc as usize)? as i32;
+        self.pc += 1;
+        let byte4 = *self.code.get(self.pc as usize)? as i32;
+        self.pc += 1;
+        Some((byte1 << 24) | (byte2 << 16) | (byte3 << 8) | byte4)
+    }
+
     pub fn read_i16(&mut self) -> Option<i16> {
         let byte1 = *self.code.get(self.pc as usize)? as i16;
         self.pc += 1;

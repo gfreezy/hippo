@@ -1,11 +1,10 @@
 pub(crate) mod type_to_basic_type;
 
-use crate::class::ClassId;
-
 use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
 use crate::gc::mark_word::MarkWord;
 use crate::gc::oop::{ArrayOop, InstanceOop, Oop};
 
+use crate::class::ClassId;
 use std::mem::size_of;
 
 pub const HEAP_WORD_SIZE: usize = size_of::<usize>();
@@ -108,6 +107,10 @@ impl BasicType {
             BasicType::Array => "[",
         }
     }
+
+    pub fn is_reference_type(&self) -> bool {
+        matches!(self, BasicType::Object | BasicType::Array)
+    }
 }
 
 impl From<u8> for BasicType {
@@ -167,9 +170,17 @@ pub type JSize = JInt;
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct JObject(Oop);
 impl JObject {
+    // oop is empty, we need to initialize first
     pub fn new(mut oop: Oop, class_id: ClassId) -> Self {
         oop.class = class_id;
-        oop.mark = MarkWord::default();
+        let mut mark = MarkWord::default();
+        mark.set_hash(oop.address().to_usize() as i32);
+        oop.mark = mark;
+        JObject(oop)
+    }
+
+    /// oop is initialized
+    pub fn make_from_oop(oop: Oop) -> Self {
         JObject(oop)
     }
 
@@ -233,6 +244,10 @@ impl JObject {
     pub fn hash_code(&self) -> JInt {
         self.0.identity_hash()
     }
+
+    pub fn oop(&self) -> Oop {
+        self.0
+    }
 }
 
 #[repr(C)]
@@ -251,7 +266,9 @@ pub struct JArray(ArrayOop);
 impl JArray {
     pub fn new(mut oop: Oop, class_id: ClassId, len: usize) -> Self {
         oop.class = class_id;
-        oop.mark = MarkWord::default();
+        let mut mark = MarkWord::default();
+        mark.set_hash(oop.address().to_usize() as i32);
+        oop.mark = mark;
         let array_oop: ArrayOop = oop.into();
         array_oop.set_len(len);
         JArray(array_oop)
@@ -261,10 +278,19 @@ impl JArray {
         self.0.len()
     }
 
+    pub fn array_oop(&self) -> ArrayOop {
+        self.0
+    }
+
+    pub fn class_id(&self) -> ClassId {
+        self.0.oop().class
+    }
+
     pub fn get<T>(&self, i: usize) -> T
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
+        assert!(i < self.len());
         self.0.element_at(i)
     }
 
@@ -272,6 +298,7 @@ impl JArray {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
+        assert!(i < self.len());
         self.0.set_element_at(i, v)
     }
 
@@ -302,6 +329,21 @@ impl JArray {
 
     pub fn is_null(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub fn get_with_basic_type(&self, ty: BasicType, index: usize) -> JValue {
+        match ty {
+            BasicType::Boolean => self.get::<JBoolean>(index).into(),
+            BasicType::Char => self.get::<JChar>(index).into(),
+            BasicType::Float => self.get::<JFloat>(index).into(),
+            BasicType::Double => self.get::<JDouble>(index).into(),
+            BasicType::Byte => self.get::<JByte>(index).into(),
+            BasicType::Short => self.get::<JShort>(index).into(),
+            BasicType::Int => self.get::<JInt>(index).into(),
+            BasicType::Long => self.get::<JLong>(index).into(),
+            BasicType::Object => self.get::<JObject>(index).into(),
+            BasicType::Array => self.get::<JObject>(index).into(),
+        }
     }
 }
 
@@ -377,7 +419,7 @@ impl From<JLong> for JValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq, Copy, Debug)]
 #[repr(C)]
 pub enum JValue {
     Boolean(JBoolean),

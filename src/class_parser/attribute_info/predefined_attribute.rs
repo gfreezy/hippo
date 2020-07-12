@@ -68,6 +68,23 @@ pub struct CodeAttribute {
     pub attributes: Vec<AttributeInfo>,
 }
 
+impl CodeAttribute {
+    pub fn line_number_tables(&self) -> Vec<LineNumberTable> {
+        let mut t: Vec<_> = self
+            .attributes
+            .iter()
+            .filter_map(|attr| match &attr.attribute {
+                PredefinedAttribute::LineNumberTableAttribute(attr) => Some(attr),
+                _ => None,
+            })
+            .flat_map(|attr| attr.line_number_table.iter())
+            .map(|table| *table)
+            .collect();
+        t.sort_by_key(|t| t.start_pc);
+        t
+    }
+}
+
 pub fn parse_code_attribute<'a>(
     const_pool: &ConstPool,
     buf: &'a [u8],
@@ -354,10 +371,10 @@ pub fn parse_source_debug_extension_attribute(
         },
     ))
 }
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct LineNumberTable {
-    start_pc: u16,
-    line_number: u16,
+    pub start_pc: u16,
+    pub line_number: u16,
 }
 
 fn parse_line_number_table(buf: &[u8]) -> IResult<&[u8], LineNumberTable> {
@@ -374,7 +391,7 @@ fn parse_line_number_table(buf: &[u8]) -> IResult<&[u8], LineNumberTable> {
 }
 #[derive(Debug)]
 pub struct LineNumberTableAttribute {
-    line_number_table: Vec<LineNumberTable>,
+    pub line_number_table: Vec<LineNumberTable>,
 }
 
 pub fn parse_line_number_table_attribute(buf: &[u8]) -> IResult<&[u8], LineNumberTableAttribute> {

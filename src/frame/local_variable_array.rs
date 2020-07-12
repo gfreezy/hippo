@@ -1,4 +1,4 @@
-use crate::gc::global_definition::JValue;
+use crate::gc::global_definition::{JInt, JLong, JValue};
 use nom::lib::std::fmt::Formatter;
 use std::fmt;
 
@@ -45,29 +45,32 @@ impl LocalVariableArray {
         LocalVariableArray { local_variables }
     }
 
-    pub fn set_integer(&mut self, index: u16, value: i32) {
+    pub fn set_jint(&mut self, index: u16, value: JInt) {
         self.local_variables[index as usize] = JValue::Int(value);
     }
 
-    pub fn get_integer(&mut self, index: u16) -> i32 {
+    pub fn get_jint(&mut self, index: u16) -> i32 {
         match self.local_variables[index as usize] {
             JValue::Int(num) => num,
             _ => unreachable!(),
         }
     }
+    pub fn set_jlong(&mut self, index: u16, value: JLong) {
+        self.local_variables[index as usize] = JValue::Long(value);
+    }
 
-    pub fn get_long(&mut self, index: u16) -> i64 {
+    pub fn get_jlong(&mut self, index: u16) -> i64 {
         match self.local_variables[index as usize] {
             JValue::Long(num) => num,
             _ => unreachable!(),
         }
     }
 
-    pub fn set_float(&mut self, index: u16, value: f32) {
+    pub fn set_jfloat(&mut self, index: u16, value: f32) {
         self.local_variables[index as usize] = JValue::Float(value);
     }
 
-    pub fn get_float(&mut self, index: u16) -> f32 {
+    pub fn get_jfloat(&mut self, index: u16) -> f32 {
         match self.local_variables[index as usize] {
             JValue::Float(num) => num,
             _ => unreachable!(),

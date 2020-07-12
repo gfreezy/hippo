@@ -55,4 +55,20 @@ impl AllocatorLocal {
             start
         }
     }
+
+    pub fn remaining(&self, align: usize) -> Option<(Address, usize)> {
+        let start = self.cursor.align_up(align);
+        if start == self.end {
+            return None;
+        }
+        Some((start, start.diff(self.end)))
+    }
+
+    pub fn current_block(&self) -> Option<&Block> {
+        self.block.as_ref()
+    }
+
+    pub fn space(&self) -> Arc<Space> {
+        self.space.clone()
+    }
 }

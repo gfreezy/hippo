@@ -1,40 +1,35 @@
 #![allow(non_snake_case, unused_variables)]
 
-use crate::class::{alloc_empty_jobject, alloc_jarray, alloc_jobject, Class};
+use crate::class::{copy_array, Class};
 use crate::class_loader::{get_class_by_id, init_class, load_class};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
-use crate::gc::global_definition::{JInt, JLong, JObject, JValue};
+use crate::debug::pretty_print;
+use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
+use crate::gc::oop::Oop;
+use crate::gc::oop_desc::InstanceOopDesc;
 use crate::java_const::{
     class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_REFLECT_FIELD, JAVA_LANG_STRING,
     JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP,
 };
 use crate::jenv::{
-    get_java_class_object, get_java_string, get_object_field, new_java_lang_string, new_jobject,
-    new_jobject_array, set_object_field, JTHREAD, THREADS,
+    alloc_jobject, get_java_class_object, get_java_primitive_object, get_java_string,
+    get_object_field, new_java_lang_string, new_jobject, new_jobject_array, set_object_field,
+    JTHREAD, THREADS,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
-use once_cell::sync::OnceCell;
-use std::collections::HashMap;
+use std::convert::TryInto;
+use std::sync::atomic::{AtomicPtr, Ordering};
+use tracing::__macro_support::AtomicUsize;
 
 pub fn java_lang_Class_getPrimitiveClass(
     thread: &mut JvmThread,
     class: &Class,
     mut args: Vec<JValue>,
 ) {
-    static PRIMITIVE_CLASSES: OnceCell<HashMap<String, JObject>> = OnceCell::new();
-    let primitive_classes = PRIMITIVE_CLASSES.get_or_init(|| {
-        let mut map = HashMap::new();
-        map.insert("float".to_string(), alloc_empty_jobject());
-        map.insert("int".to_string(), alloc_empty_jobject());
-        map.insert("double".to_string(), alloc_empty_jobject());
-        map.insert("short".to_string(), alloc_empty_jobject());
-        map.insert("byte".to_string(), alloc_empty_jobject());
-        map
-    });
     let string_ref = args.pop().unwrap();
     let class_name = get_java_string(string_ref.as_jobject());
-    let primitive_class = primitive_classes.get(&class_name).unwrap();
+    let primitive_class = get_java_primitive_object(&class_name);
     let frame = thread.current_frame_mut();
     frame.operand_stack.push_jobject(primitive_class.clone());
 }
@@ -91,6 +86,8 @@ pub fn java_lang_Class_getDeclaredFields0(
 
         obj_array.set(i, field_obj);
     }
+    println!("declared fields");
+    pretty_print(obj_array);
     thread.push_jarray(obj_array);
 }
 
@@ -195,10 +192,17 @@ pub fn sun_misc_Unsafe_arrayBaseOffset(thread: &mut JvmThread, _class: &Class, a
 }
 
 pub fn sun_misc_Unsafe_arrayIndexScale(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    // todo
+    match args.as_slice() {
+        &[JValue::Object(unsafe_obj), JValue::Object(mirror)] => {}
+        _ => unreachable!(),
+    }
     thread.current_frame_mut().operand_stack.push_jint(1);
 }
 
 pub fn sun_misc_Unsafe_addressSize(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    // todo
+
     thread.current_frame_mut().operand_stack.push_jint(8);
 }
 
@@ -218,8 +222,13 @@ pub fn sun_reflect_Reflection_getCallerClass(
         .push_jobject(caller_class);
 }
 
-pub fn java_io_FileInputStream_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
-pub fn java_io_FileDescriptor_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
+pub fn java_io_FileInputStream_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    // todo
+}
+pub fn java_io_FileDescriptor_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    // todo
+}
+
 pub fn java_lang_Throwable_fillInStackTrace(
     thread: &mut JvmThread,
     _class: &Class,
@@ -230,6 +239,7 @@ pub fn java_lang_Throwable_fillInStackTrace(
 }
 
 pub fn java_io_FileOutputStream_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    // todo
 }
 
 pub fn java_security_AccessController_doPrivileged(
@@ -272,7 +282,7 @@ pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, arg
         );
         set_object_field(thread_object, "priority", "I", 1);
         let thread_id = thread_id::get() as i64;
-        THREADS.get().unwrap().lock().insert(thread_id);
+        THREADS.lock().insert(thread_id);
         set_object_field(thread_object, "tid", "J", thread_id);
 
         thread.set_thread_object(thread_object);
@@ -323,7 +333,7 @@ pub fn java_lang_Thread_setPriority0(thread: &mut JvmThread, class: &Class, args
 pub fn java_lang_Thread_isAlive(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
     let obj = args[0].as_jobject();
     let tid: JLong = get_object_field(obj, "tid", "J");
-    let alive = THREADS.get().unwrap().lock().contains(&tid);
+    let alive = THREADS.lock().contains(&tid);
     thread.current_frame_mut().operand_stack.push_jbool(alive)
 }
 
@@ -342,14 +352,91 @@ pub fn java_lang_Thread_start0(thread: &mut JvmThread, class: &Class, args: Vec<
             )
         });
         let thread_id = thread_id::get() as i64;
-        THREADS.get().unwrap().lock().remove(&thread_id);
+        THREADS.lock().remove(&thread_id);
     });
 }
 
-pub fn java_misc_Unsafe_compareAndSwapObject(
+pub fn sun_misc_Unsafe_compareAndSwapObject(
     thread: &mut JvmThread,
     class: &Class,
     args: Vec<JValue>,
 ) {
-    // todo: here
+    let (unsafe_obj, p, offset, e, x) = match args.as_slice() {
+        [JValue::Object(unsafe_obj), JValue::Object(p), JValue::Long(offset), JValue::Object(e), JValue::Object(x)] => {
+            (unsafe_obj, p, offset, e, x)
+        }
+        _ => unreachable!(),
+    };
+    let success = compare_and_swap_object(unsafe_obj, *offset, e, x);
+    thread.push_jbool(success)
+}
+
+pub fn java_lang_System_arraycopy(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let (src, src_pos, dst, dst_pos, length) = match args.as_slice() {
+        &[JValue::Object(src), JValue::Int(src_pos), JValue::Object(dst), JValue::Int(dst_pos), JValue::Int(length)] => {
+            (src, src_pos, dst, dst_pos, length)
+        }
+        _ => unreachable!(),
+    };
+    let src_array: JArray = src.into();
+    let dst_array: JArray = dst.into();
+    copy_array(
+        thread,
+        src_array.array_oop(),
+        src_pos.try_into().unwrap(),
+        dst_array.array_oop(),
+        dst_pos.try_into().unwrap(),
+        length.try_into().unwrap(),
+    );
+}
+
+fn compare_and_swap_object(obj: &JObject, offset: i64, expect: &JObject, target: &JObject) -> bool {
+    let target_oop = target.oop().address();
+    let expect_oop = expect.oop().address();
+
+    let addr = obj
+        .oop()
+        .address()
+        .plus(InstanceOopDesc::base_offset_in_bytes() + offset as usize);
+    let p = addr.as_atomic_ptr();
+    let old = p.compare_and_swap(
+        expect_oop.as_mut_ptr(),
+        target_oop.as_mut_ptr(),
+        Ordering::SeqCst,
+    );
+    let success = old == expect_oop.as_mut_ptr();
+    success
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::class_loader::load_class;
+    use crate::debug::pretty_print;
+    use crate::gc::global_definition::{BasicType, JArray, JObject};
+    use crate::gc::oop::Oop;
+    use crate::gc::oop_desc::InstanceOopDesc;
+    use crate::java_const::JAVA_LANG_STRING;
+    use crate::jenv::{alloc_jobject, new_java_lang_string, new_jtype_array};
+    use crate::jvm::Jvm;
+    use crate::native::compare_and_swap_object;
+    use std::sync::atomic::{AtomicPtr, Ordering};
+
+    #[test]
+    fn test_compare_and_swap_object() {
+        let _jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        let bytes_str: Vec<u16> = "hello".encode_utf16().collect();
+        let expect = new_jtype_array(BasicType::Char, bytes_str.len());
+        expect.copy_from(&bytes_str);
+        let bytes_str2: Vec<u16> = "world".encode_utf16().collect();
+        let target = new_jtype_array(BasicType::Char, bytes_str.len());
+        target.copy_from(&bytes_str2);
+        let class = load_class(JObject::null(), JAVA_LANG_STRING);
+        let obj = alloc_jobject(&class);
+        let f = class.get_field("value", "[C").unwrap();
+        obj.set_field_by_offset(f.offset(), expect);
+
+        let ret = compare_and_swap_object(&obj, f.offset() as i64, &expect.into(), &target.into());
+        assert_eq!(obj.get_field_by_offset::<JArray>(f.offset()), target);
+        assert!(ret);
+    }
 }

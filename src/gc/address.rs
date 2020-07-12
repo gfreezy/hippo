@@ -1,14 +1,27 @@
 use crate::gc::mem::align_usize;
-use std::mem;
+use crate::gc::oop::Oop;
+use std::sync::atomic::{AtomicPtr, AtomicUsize};
+use std::{fmt, mem};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[repr(C)]
 pub struct Address(usize);
+
+impl fmt::Debug for Address {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Address {{ {} }}", self.0)
+    }
+}
 
 impl Address {
     #[inline(always)]
     pub fn plus(&self, bytes: usize) -> Address {
         Address(self.0 + bytes)
+    }
+
+    #[inline(always)]
+    pub fn to_usize(&self) -> usize {
+        self.0
     }
 
     #[inline(always)]
@@ -19,6 +32,16 @@ impl Address {
     #[inline(always)]
     pub fn as_ptr<T>(&self) -> *const T {
         self.0 as *const T
+    }
+
+    #[inline(always)]
+    pub fn as_mut_ptr<T>(&self) -> *mut T {
+        self.0 as *mut T
+    }
+
+    #[inline(always)]
+    pub fn as_atomic_ptr(&self) -> &AtomicPtr<Oop> {
+        unsafe { &*self.as_ptr::<AtomicPtr<Oop>>() }
     }
 
     #[inline(always)]

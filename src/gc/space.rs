@@ -39,6 +39,7 @@ impl Space {
             let block = Block {
                 start: block_start,
                 end: block_end,
+                inited: false,
             };
             usable_blocks.push_back(block);
         }
@@ -55,7 +56,19 @@ impl Space {
     }
 
     pub fn get_next_usable_block(&self) -> Option<Block> {
-        self.usable_blocks.lock().pop_front()
+        let mut block = self.usable_blocks.lock().pop_front()?;
+        block.inited = true;
+        Some(block)
+    }
+
+    pub fn iter_blocks(&self, f: impl Fn(&Block)) {
+        for block in self.used_blocks.lock().iter() {
+            f(block);
+        }
+
+        for block in self.usable_blocks.lock().iter().filter(|b| b.inited) {
+            f(block);
+        }
     }
 }
 

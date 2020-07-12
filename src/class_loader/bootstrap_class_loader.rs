@@ -22,25 +22,18 @@ impl BootstrapClassLoader {
         debug!(%name, "load_class");
         let name_bytes = name.as_bytes();
         match name_bytes {
-            [b'[', ty] => {
-                let dimension = name_bytes.len() - 1;
-                Class::TypeArrayClass(TypeArrayClass::new(
-                    name.to_string(),
-                    (*ty).into(),
-                    dimension,
-                    JObject::null(),
-                ))
-            }
-            [b'[', b'L', class_name @ .., b';'] => {
-                let dimension = 1;
-                Class::ObjArrayClass(ObjArrayClass::new(
-                    name.to_string(),
-                    load_class(JObject::null(), std::str::from_utf8(class_name).unwrap()),
-                    dimension,
-                    JObject::null(),
-                ))
-            }
-            [b'L', name_slice @ .., b';'] | name_slice => {
+            [b'[', ty] => Class::TypeArrayClass(TypeArrayClass::new(
+                name.to_string(),
+                (*ty).into(),
+                JObject::null(),
+            )),
+            [b'[', element @ ..] => Class::ObjArrayClass(ObjArrayClass::new(
+                name.to_string(),
+                load_class(JObject::null(), std::str::from_utf8(element).unwrap()),
+                JObject::null(),
+            )),
+            [b'L', .., b';'] => unreachable!(),
+            name_slice => {
                 let class_name = std::str::from_utf8(name_slice).unwrap();
                 let data = self
                     .class_path

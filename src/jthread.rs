@@ -1,7 +1,8 @@
 use crate::class::{Class, Method};
+use crate::frame::local_variable_array::LocalVariableArray;
 use crate::frame::operand_stack::OperandStack;
 use crate::frame::JvmFrame;
-use crate::gc::global_definition::{JArray, JDouble, JFloat, JInt, JLong, JObject, JValue};
+use crate::gc::global_definition::{JArray, JChar, JDouble, JFloat, JInt, JLong, JObject, JValue};
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -35,6 +36,42 @@ impl JvmThread {
 
     pub fn current_frame(&self) -> Option<&JvmFrame> {
         self.stack.frames.back()
+    }
+
+    pub fn local_variable_array(&mut self) -> &mut LocalVariableArray {
+        &mut self.current_frame_mut().local_variable_array
+    }
+
+    pub fn set_local_variable(&mut self, index: u16, value: JValue) {
+        self.local_variable_array().set(index, value)
+    }
+
+    pub fn set_local_variable_jint(&mut self, index: u16, val: JInt) {
+        self.local_variable_array().set_jint(index, val)
+    }
+
+    pub fn set_local_variable_jlong(&mut self, index: u16, val: JLong) {
+        self.local_variable_array().set_jlong(index, val)
+    }
+
+    pub fn set_local_variable_jfloat(&mut self, index: u16, val: JFloat) {
+        self.local_variable_array().set_jfloat(index, val)
+    }
+
+    pub fn get_local_variable_jint(&mut self, index: u16) -> JInt {
+        self.local_variable_array().get_jint(index)
+    }
+
+    pub fn get_local_variable_jlong(&mut self, index: u16) -> JLong {
+        self.local_variable_array().get_jlong(index)
+    }
+
+    pub fn get_local_variable_jfloat(&mut self, index: u16) -> JFloat {
+        self.local_variable_array().get_jfloat(index)
+    }
+
+    pub fn get_local_variable_jobject(&mut self, index: u16) -> JValue {
+        self.local_variable_array().get_jobject(index)
     }
 
     pub fn operand_stack(&mut self) -> &mut OperandStack {
@@ -81,6 +118,9 @@ impl JvmThread {
         self.current_frame_mut().code_reader.read_u16().unwrap()
     }
 
+    pub fn read_i32(&mut self) -> i32 {
+        self.current_frame_mut().code_reader.read_i32().unwrap()
+    }
     pub fn read_i16(&mut self) -> i16 {
         self.current_frame_mut().code_reader.read_i16().unwrap()
     }
@@ -101,6 +141,10 @@ impl JvmThread {
         self.operand_stack().push_jint(num)
     }
 
+    pub fn push_jbool(&mut self, v: bool) {
+        self.operand_stack().push_jbool(v)
+    }
+
     pub fn push_jlong(&mut self, num: JLong) {
         self.operand_stack().push_jlong(num)
     }
@@ -110,6 +154,10 @@ impl JvmThread {
 
     pub fn push_jfloat(&mut self, num: JFloat) {
         self.operand_stack().push_jfloat(num)
+    }
+
+    pub fn push_jchar(&mut self, num: JChar) {
+        self.operand_stack().push_jchar(num)
     }
 
     pub fn push_jobject(&mut self, v: JObject) {
@@ -130,6 +178,9 @@ impl JvmThread {
 
     pub fn pop_jint(&mut self) -> JInt {
         self.operand_stack().pop_jint()
+    }
+    pub fn pop_unsigned_jint(&mut self) -> JInt {
+        self.operand_stack().pop_unsigned_jint()
     }
 
     pub fn pop_jdouble(&mut self) -> JDouble {

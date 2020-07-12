@@ -5,56 +5,57 @@ use crate::class_loader::{init_class, load_class, BOOTSTRAP_LOADER};
 use crate::frame::JvmFrame;
 use crate::gc::global_definition::{JObject, JValue};
 
-use crate::gc::allocator_local::AllocatorLocal;
-use crate::gc::space::Space;
-use crate::gc::tlab::initialize_tlab;
+use crate::debug::dump_space;
 use crate::instruction::opcode::show_opcode;
 use crate::instruction::*;
-use crate::jenv::{JTHREAD, THREADS};
+use crate::jenv::JTHREAD;
 use crate::jthread::JvmThread;
 use crate::native::*;
-use nom::lib::std::collections::HashSet;
-use parking_lot::Mutex;
-use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use tracing::debug;
 
+pub static SPACE_SIZE: AtomicUsize = AtomicUsize::new(1024 * 1024 * 100);
+
 #[derive(Debug)]
-pub struct Jvm {
-    main_class: String,
+pub struct Jvm;
+
+pub fn backtraces(thread: &JvmThread) {
+    for frame in &thread.stack.frames {
+        eprintln!(
+            "{}.{}:{}, pc={}, line={:?}",
+            frame.method.class_name(),
+            frame.method.name(),
+            frame.method.descriptor(),
+            frame.pc() - 1,
+            frame.method.line_for_pc(frame.pc() - 1),
+        );
+        eprintln!(
+            "\tlocals: {:?}\n\toperand_stack:{:?}",
+            frame.local_variable_array, frame.operand_stack,
+        );
+    }
 }
 
 impl Drop for Jvm {
     fn drop(&mut self) {
         eprintln!("backtraces:\n");
         JTHREAD.with(|thread| {
-            for frame in &thread.borrow().stack.frames {
-                eprintln!(
-                    "{}.{}:{}, pc={}",
-                    frame.method.class_name(),
-                    frame.method.name(),
-                    frame.method.descriptor(),
-                    frame.pc() - 1
-                );
-                eprintln!(
-                    "\tlocals: {:?}\n\toperand_stack:{:?}",
-                    frame.local_variable_array, frame.operand_stack,
-                );
-            }
+            backtraces(&*thread.borrow());
         });
+
+        dump_space();
     }
 }
 
 impl Jvm {
-    pub fn new(class_name: &str, jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
-        let jvm = Jvm {
-            main_class: class_name.to_string(),
-        };
-        BOOTSTRAP_LOADER
-            .set(BootstrapClassLoader::new(ClassPath::new(jre_opt, cp_opt)))
-            .unwrap();
-        THREADS.set(Mutex::new(HashSet::new())).unwrap();
-        initialize_tlab(AllocatorLocal::new(Arc::new(Space::new(1024 * 1024 * 100))));
+    pub fn new(jre_opt: Option<String>, cp_opt: Option<String>) -> Self {
+        let classpath = ClassPath::new(jre_opt, cp_opt);
+        let _ = BOOTSTRAP_LOADER.set(BootstrapClassLoader::new(classpath));
 
+        Jvm
+    }
+
+    pub fn run(&mut self, main_class: &str) {
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
             let system_class = load_class(JObject::null(), "java/lang/System");
@@ -65,13 +66,10 @@ impl Jvm {
 
             execute_class_method(&mut thread, system_class, system_class_initialize, vec![]);
         });
-        jvm
-    }
 
-    pub fn run(&mut self) {
         JTHREAD.with(|thread| {
             let mut thread = thread.borrow_mut();
-            let class = load_class(JObject::null(), &self.main_class);
+            let class = load_class(JObject::null(), main_class);
             init_class(&mut thread, &class);
             let main_method = class
                 .get_method("main", "([Ljava/lang/String;)V", true)
@@ -117,6 +115,15 @@ pub fn execute_class_method(
 
     let is_native = method.is_native();
 
+    println!("----------------------");
+    println!(
+        "execute_method: {} {} {} {}",
+        class,
+        method,
+        method.descriptor(),
+        is_native
+    );
+    // backtraces(thread);
     let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();
 
@@ -204,6 +211,12 @@ pub fn execute_class_method(
             opcode::AASTORE => {
                 aastore(thread, &class);
             }
+            opcode::IASTORE => {
+                iastore(thread, &class);
+            }
+            opcode::IALOAD => {
+                iaload(thread, &class);
+            }
             opcode::BIPUSH => {
                 bipush(thread, &class);
             }
@@ -269,6 +282,12 @@ pub fn execute_class_method(
             }
             opcode::IADD => {
                 iadd(thread, &class);
+            }
+            opcode::INEG => {
+                ineg(thread, &class);
+            }
+            opcode::IMUL => {
+                imul(thread, &class);
             }
             opcode::IREM => {
                 irem(thread, &class);
@@ -391,6 +410,9 @@ pub fn execute_class_method(
             opcode::I2F => {
                 i2f(thread, &class);
             }
+            opcode::I2C => {
+                i2c(thread, &class);
+            }
             opcode::F2I => {
                 f2i(thread, &class);
             }
@@ -424,6 +446,9 @@ pub fn execute_class_method(
             opcode::ISHL => {
                 ishl(thread, &class);
             }
+            opcode::ISHR => {
+                ishr(thread, &class);
+            }
             opcode::IUSHR => {
                 iushr(thread, &class);
             }
@@ -435,6 +460,9 @@ pub fn execute_class_method(
             }
             opcode::IAND => {
                 iand(thread, &class);
+            }
+            opcode::IOR => {
+                ior(thread, &class);
             }
             opcode::ISUB => {
                 isub(thread, &class);
@@ -462,6 +490,12 @@ pub fn execute_class_method(
             }
             opcode::ATHROW => {
                 athrow(thread, &class);
+            }
+            opcode::TABLESWITCH => {
+                tableswitch(thread, &class);
+            }
+            opcode::LOOKUPSWITCH => {
+                lookupswitch(thread, &class);
             }
             opcode::MONITORENTER | opcode::MONITOREXIT => {}
             op => unimplemented!("{}", show_opcode(op)),
@@ -512,6 +546,9 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
             java_lang_Object_registerNatives(thread, class, args);
         }
         ("java/lang/Class", "registerNatives", "()V") => {
+            registerNatives(thread, class, args);
+        }
+        ("java/lang/ClassLoader", "registerNatives", "()V") => {
             registerNatives(thread, class, args);
         }
         ("java/lang/Thread", "registerNatives", "()V") => {
@@ -596,12 +633,18 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
             "compareAndSwapObject",
             "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z",
         ) => {
-            java_misc_Unsafe_compareAndSwapObject(thread, class, args);
+            sun_misc_Unsafe_compareAndSwapObject(thread, class, args);
+        }
+        ("java/lang/System", "arraycopy", "(Ljava/lang/Object;ILjava/lang/Object;II)V") => {
+            java_lang_System_arraycopy(thread, class, args);
         }
         (class_name, name, descriptor) => {
             panic!(
-                r#"native method: ("{}", "{}", "{}")"#,
-                class_name, name, descriptor
+                r#"native method: ("{}", "{}", "{}") is_static: {}"#,
+                class_name,
+                name,
+                descriptor,
+                method.is_static()
             );
         }
     };

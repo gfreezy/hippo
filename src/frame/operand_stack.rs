@@ -1,4 +1,4 @@
-use crate::gc::global_definition::{JArray, JDouble, JFloat, JInt, JLong, JObject, JValue};
+use crate::gc::global_definition::{JArray, JChar, JDouble, JFloat, JInt, JLong, JObject, JValue};
 
 #[derive(Debug)]
 pub struct OperandStack {
@@ -37,6 +37,9 @@ impl OperandStack {
     pub fn push_jdouble(&mut self, num: JDouble) {
         self.push(JValue::Double(num))
     }
+    pub fn push_jchar(&mut self, num: JChar) {
+        self.push(JValue::Char(num))
+    }
 
     pub fn push_jfloat(&mut self, num: JFloat) {
         self.push(JValue::Float(num))
@@ -58,10 +61,22 @@ impl OperandStack {
         self.pop().as_jarray()
     }
 
+    pub fn pop_unsigned_jint(&mut self) -> JInt {
+        let n = match self.stack.pop() {
+            Some(JValue::Int(num)) => num,
+            Some(JValue::Boolean(num)) => num as JInt,
+            Some(JValue::Char(num)) => num as JInt,
+            v => unreachable!("{:?}", v),
+        };
+        assert!(n >= 0);
+        n
+    }
+
     pub fn pop_jint(&mut self) -> JInt {
         match self.stack.pop() {
             Some(JValue::Int(num)) => num,
             Some(JValue::Boolean(num)) => num as JInt,
+            Some(JValue::Char(num)) => num as JInt,
             v => unreachable!("{:?}", v),
         }
     }

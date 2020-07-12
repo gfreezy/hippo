@@ -1,5 +1,3 @@
-
-
 // Constants
 pub const AGE_BITS: usize = 4;
 pub const LOCK_BITS: usize = 2;
@@ -47,8 +45,13 @@ pub const fn mask_bits(n: usize, m: usize) -> usize {
 pub struct MarkWord(u64);
 
 impl MarkWord {
-    pub fn hash(self) -> i32 {
+    pub fn hash(&self) -> i32 {
         mask_bits((self.0 >> HASH_SHIFT) as usize, HASH_MASK) as i32
+    }
+
+    pub fn set_hash(&mut self, hash: i32) {
+        self.0 = (mask_bits(self.0 as usize, !HASH_MASK_IN_PLACE) | ((hash as usize) << HASH_SHIFT))
+            as u64;
     }
 }
 

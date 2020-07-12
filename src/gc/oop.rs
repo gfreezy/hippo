@@ -2,9 +2,9 @@ use crate::gc::address::Address;
 
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, OopDesc};
 
-use nom::lib::std::ops::DerefMut;
+use crate::class::ClassId;
 use std::mem;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(C)]
@@ -14,8 +14,14 @@ impl Oop {
     pub fn new(addr: Address) -> Oop {
         Oop(addr)
     }
+    pub fn address(&self) -> Address {
+        self.0
+    }
     pub fn empty() -> Oop {
         unsafe { Oop(Address::zero()) }
+    }
+    pub fn clear(&self, size: usize) {
+        unsafe { std::ptr::write_bytes(self.address().as_mut_ptr::<u8>(), 0, size) }
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -71,6 +77,9 @@ impl ArrayOop {
     }
     pub fn oop(&self) -> Oop {
         self.0
+    }
+    pub fn class_id(&self) -> ClassId {
+        self.oop().class
     }
     pub fn empty() -> ArrayOop {
         ArrayOop(Oop::empty())

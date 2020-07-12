@@ -39,7 +39,7 @@ pub const JVM_ACC_ANNOTATION: u16 = 0x2000;
 pub const JVM_ACC_ENUM: u16 = 0x4000;
 pub const JVM_ACC_MODULE: u16 = 0x8000;
 
-pub const JVM_RECOGNIZED_FIELD_MODIFIERS: u16 = (JVM_ACC_PUBLIC
+pub const JVM_RECOGNIZED_FIELD_MODIFIERS: u16 = JVM_ACC_PUBLIC
     | JVM_ACC_PRIVATE
     | JVM_ACC_PROTECTED
     | JVM_ACC_STATIC
@@ -47,7 +47,7 @@ pub const JVM_RECOGNIZED_FIELD_MODIFIERS: u16 = (JVM_ACC_PUBLIC
     | JVM_ACC_VOLATILE
     | JVM_ACC_TRANSIENT
     | JVM_ACC_ENUM
-    | JVM_ACC_SYNTHETIC);
+    | JVM_ACC_SYNTHETIC;
 
 #[derive(Debug)]
 pub struct ClassFile {
@@ -215,63 +215,4 @@ fn parse_constant_pool_infos(size: u16, mut buf: &[u8]) -> IResult<&[u8], Vec<Co
         }
     }
     Ok((buf, real_pool))
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::class_parser::parse_class_file;
-    use insta::assert_debug_snapshot;
-    use std::fs::File;
-    use std::io::Read;
-
-    #[test]
-    fn test_parse_class_file() {
-        let data = [
-            202, 254, 186, 190, 0, 0, 0, 52, 0, 29, 10, 0, 6, 0, 15, 9, 0, 16, 0, 17, 8, 0, 18, 10,
-            0, 19, 0, 20, 7, 0, 21, 7, 0, 22, 1, 0, 6, 60, 105, 110, 105, 116, 62, 1, 0, 3, 40, 41,
-            86, 1, 0, 4, 67, 111, 100, 101, 1, 0, 15, 76, 105, 110, 101, 78, 117, 109, 98, 101,
-            114, 84, 97, 98, 108, 101, 1, 0, 4, 109, 97, 105, 110, 1, 0, 22, 40, 91, 76, 106, 97,
-            118, 97, 47, 108, 97, 110, 103, 47, 83, 116, 114, 105, 110, 103, 59, 41, 86, 1, 0, 10,
-            83, 111, 117, 114, 99, 101, 70, 105, 108, 101, 1, 0, 9, 77, 97, 105, 110, 46, 106, 97,
-            118, 97, 12, 0, 7, 0, 8, 7, 0, 23, 12, 0, 24, 0, 25, 1, 0, 5, 72, 101, 108, 108, 111,
-            7, 0, 26, 12, 0, 27, 0, 28, 1, 0, 9, 77, 97, 105, 110, 47, 77, 97, 105, 110, 1, 0, 16,
-            106, 97, 118, 97, 47, 108, 97, 110, 103, 47, 79, 98, 106, 101, 99, 116, 1, 0, 16, 106,
-            97, 118, 97, 47, 108, 97, 110, 103, 47, 83, 121, 115, 116, 101, 109, 1, 0, 3, 111, 117,
-            116, 1, 0, 21, 76, 106, 97, 118, 97, 47, 105, 111, 47, 80, 114, 105, 110, 116, 83, 116,
-            114, 101, 97, 109, 59, 1, 0, 19, 106, 97, 118, 97, 47, 105, 111, 47, 80, 114, 105, 110,
-            116, 83, 116, 114, 101, 97, 109, 1, 0, 7, 112, 114, 105, 110, 116, 108, 110, 1, 0, 21,
-            40, 76, 106, 97, 118, 97, 47, 108, 97, 110, 103, 47, 83, 116, 114, 105, 110, 103, 59,
-            41, 86, 0, 33, 0, 5, 0, 6, 0, 0, 0, 0, 0, 2, 0, 1, 0, 7, 0, 8, 0, 1, 0, 9, 0, 0, 0, 29,
-            0, 1, 0, 1, 0, 0, 0, 5, 42, 183, 0, 1, 177, 0, 0, 0, 1, 0, 10, 0, 0, 0, 6, 0, 1, 0, 0,
-            0, 3, 0, 9, 0, 11, 0, 12, 0, 1, 0, 9, 0, 0, 0, 37, 0, 2, 0, 1, 0, 0, 0, 9, 178, 0, 2,
-            18, 3, 182, 0, 4, 177, 0, 0, 0, 1, 0, 10, 0, 0, 0, 10, 0, 2, 0, 0, 0, 5, 0, 8, 0, 6, 0,
-            1, 0, 13, 0, 0, 0, 2, 0, 14,
-        ];
-
-        let (buf, class) = parse_class_file(&data).expect("parse class");
-        assert_debug_snapshot!((buf, class));
-    }
-
-    #[test]
-    fn test_parse_java_utils_properties() {
-        let mut f = File::open("rt/java/util/Properties.class").unwrap();
-        let mut data = vec![];
-        let _ = f.read_to_end(&mut data).unwrap();
-
-        let (buf, class) = parse_class_file(&data).expect("parse class");
-        assert_debug_snapshot!((buf, class));
-    }
-
-    #[test]
-    fn test_parse_child_class() {
-        let mut f = File::open(
-            "/Users/feichao/Develop/allsunday/test-java/out/production/test-java/ITs.class",
-        )
-        .unwrap();
-        let mut data = vec![];
-        let _ = f.read_to_end(&mut data).unwrap();
-
-        let (buf, class) = parse_class_file(&data).expect("parse class");
-        assert_debug_snapshot!((buf, class));
-    }
 }

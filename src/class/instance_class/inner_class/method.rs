@@ -9,6 +9,7 @@ use crate::class_parser::{
 };
 use crate::gc::global_definition::{BasicType, JObject};
 
+use crate::class_parser::attribute_info::predefined_attribute::LineNumberTable;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -33,6 +34,7 @@ struct InnerMethod {
     n_args: usize,
     code: Arc<Vec<u8>>,
     parameters: Vec<Parameter>,
+    line_number_tables: Vec<LineNumberTable>,
     class_name: String,
     param_descriptors: Vec<String>,
     return_descriptor: String,
@@ -73,6 +75,7 @@ impl Method {
                     descriptor: descriptor.to_string(),
                     max_locals: 0,
                     max_stack: 0,
+                    line_number_tables: vec![],
                     code: Arc::new(vec![]),
                     n_args,
                     parameters,
@@ -87,6 +90,7 @@ impl Method {
             let code_attr = method_info
                 .code_attr()
                 .unwrap_or_else(|| panic!("get method code attr: {}", name));
+            let line_number_table = code_attr.line_number_tables();
 
             Method {
                 inner: Arc::new(InnerMethod {
@@ -96,6 +100,7 @@ impl Method {
                     cp_cache: Mutex::new(CpCache::new(code_attr.code.len())),
                     max_locals: code_attr.max_locals as usize,
                     max_stack: code_attr.max_stack as usize,
+                    line_number_tables: line_number_table,
                     code: Arc::new(code_attr.code),
                     n_args,
                     parameters,
@@ -118,6 +123,19 @@ impl Method {
 
     pub fn resolve_field(&self, pc: usize) -> Option<(BasicType, usize)> {
         self.inner.cp_cache.lock().unwrap().resolve_field(pc)
+    }
+
+    pub fn line_for_pc(&self, pc: usize) -> Option<u16> {
+        let tables = &self.inner.line_number_tables;
+        if tables.is_empty() {
+            return None;
+        }
+        let found = tables.binary_search_by_key(&pc, |t| t.start_pc as usize);
+        Some(match found {
+            Ok(index) => tables[index].line_number,
+            Err(0) => unreachable!(),
+            Err(index) => tables[index - 1].line_number,
+        })
     }
 
     pub fn set_field(&self, pc: usize, ty: BasicType, field_index: usize) {

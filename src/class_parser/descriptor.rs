@@ -60,7 +60,7 @@ mod tests {
         let (_, field) = field_descriptor("I").unwrap();
         assert_eq!(field, "I");
         let (_, field) = field_descriptor("Ljava/lang/Thread;").unwrap();
-        assert_eq!(field, "java/lang/Thread");
+        assert_eq!(field, "Ljava/lang/Thread;");
         let (_, method) = method_descriptor("(IDLjava/lang/Thread;)Ljava/lang/Object;").unwrap();
         assert_eq!(
             method,
@@ -68,9 +68,9 @@ mod tests {
                 vec![
                     "I".to_string(),
                     "D".to_string(),
-                    "java/lang/Thread".to_string()
+                    "Ljava/lang/Thread;".to_string()
                 ],
-                "java/lang/Object".to_string()
+                "Ljava/lang/Object;".to_string()
             )
         );
         let (_, method) =
@@ -82,10 +82,10 @@ mod tests {
                 vec![
                     "I".to_string(),
                     "D".to_string(),
-                    "java/lang/Thread".to_string(),
-                    "[[[java/lang/Thread".to_string(),
+                    "Ljava/lang/Thread;".to_string(),
+                    "[[[Ljava/lang/Thread;".to_string(),
                 ],
-                "java/lang/Object".to_string()
+                "Ljava/lang/Object;".to_string()
             )
         )
     }

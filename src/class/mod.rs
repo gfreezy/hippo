@@ -10,16 +10,13 @@ pub use self::instance_class::Method;
 pub use self::instance_class::SuperClassesIter;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
 pub use self::instance_mirror_class::InstanceMirrorClass;
-pub use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
-use crate::class_loader::get_class_id_by_name;
+pub use crate::class::array_class::{copy_array, ObjArrayClass, TypeArrayClass};
+use crate::class_loader::load_class;
 use crate::class_parser::constant_pool::ConstPool;
 
-use crate::gc::global_definition::{
-    BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
-};
-use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
-use crate::gc::tlab::alloc_tlab;
+use crate::gc::global_definition::{BasicType, JObject};
 
+use crate::java_const::JAVA_LANG_OBJECT;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -59,8 +56,38 @@ impl Class {
         }
     }
 
-    pub fn ty(&self) -> ClassType {
-        unimplemented!()
+    pub fn as_type_array_class(&self) -> TypeArrayClass {
+        match self {
+            Class::TypeArrayClass(c) => c.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn is_array_class(&self) -> bool {
+        self.is_type_array_class() || self.is_obj_array_class()
+    }
+
+    pub fn is_type_array_class(&self) -> bool {
+        matches!(self, Class::TypeArrayClass(_))
+    }
+
+    pub fn is_obj_array_class(&self) -> bool {
+        matches!(self, Class::ObjArrayClass(_))
+    }
+
+    pub fn as_obj_array_class(&self) -> ObjArrayClass {
+        match self {
+            Class::ObjArrayClass(c) => c.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn element_type(&self) -> BasicType {
+        match self {
+            Class::TypeArrayClass(c) => c.ty(),
+            Class::ObjArrayClass(_) => BasicType::Object,
+            _ => unreachable!(),
+        }
     }
 
     pub fn mirror_class(&self) -> JObject {
@@ -236,8 +263,9 @@ impl Class {
             Class::InstanceClass(c) => c.super_class(),
             Class::InstanceClassLoaderClass(c) => c.super_class(),
             Class::InstanceMirrorClass(c) => c.super_class(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(_) | Class::ObjArrayClass(_) => {
+                Some(load_class(self.class_loader(), JAVA_LANG_OBJECT))
+            }
         }
     }
 
@@ -276,8 +304,8 @@ impl Class {
             Class::InstanceClass(c) => c.methods(),
             Class::InstanceClassLoaderClass(c) => c.methods(),
             Class::InstanceMirrorClass(c) => c.methods(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(_) => &[],
+            Class::ObjArrayClass(_) => &[],
         }
     }
 
@@ -286,8 +314,8 @@ impl Class {
             Class::InstanceClass(c) => c.interfaces(),
             Class::InstanceClassLoaderClass(c) => c.interfaces(),
             Class::InstanceMirrorClass(c) => c.interfaces(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(_) => &[],
+            Class::ObjArrayClass(_) => &[],
         }
     }
 
@@ -302,13 +330,7 @@ impl Class {
     }
 
     pub fn iter_super_classes(&self) -> SuperClassesIter {
-        match self {
-            Class::InstanceClass(c) => c.iter_super_classes(),
-            Class::InstanceClassLoaderClass(c) => c.iter_super_classes(),
-            Class::InstanceMirrorClass(c) => c.iter_super_classes(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
-        }
+        SuperClassesIter::new(self.super_class())
     }
 
     pub fn did_implement_interface(&self, interface: Class) -> bool {
@@ -326,8 +348,8 @@ impl Class {
             Class::InstanceClass(c) => c.clinit_method(),
             Class::InstanceClassLoaderClass(c) => c.clinit_method(),
             Class::InstanceMirrorClass(c) => c.clinit_method(),
-            Class::TypeArrayClass(_) => unreachable!(),
-            Class::ObjArrayClass(_) => unreachable!(),
+            Class::TypeArrayClass(_) => None,
+            Class::ObjArrayClass(c) => c.element_class().clinit_method(),
         }
     }
 
@@ -448,31 +470,4 @@ pub enum ClassType {
     TypeArrayClass,
     ObjArrayClass,
     None,
-}
-
-pub fn alloc_jobject(class: &Class) -> JObject {
-    let size = class.instance_size() + InstanceOopDesc::header_size_in_bytes();
-
-    JObject::new(alloc_tlab(size), get_class_id_by_name(class.name()))
-}
-
-pub fn alloc_empty_jobject() -> JObject {
-    let size = InstanceOopDesc::header_size_in_bytes();
-    JObject::new(alloc_tlab(size), 0)
-}
-
-pub fn alloc_jarray(ty: BasicType, class_id: ClassId, len: usize) -> JArray {
-    let size = match ty {
-        BasicType::Boolean => ArrayOopDesc::array_size_in_bytes::<JBoolean>(len),
-        BasicType::Char => ArrayOopDesc::array_size_in_bytes::<JChar>(len),
-        BasicType::Float => ArrayOopDesc::array_size_in_bytes::<JFloat>(len),
-        BasicType::Double => ArrayOopDesc::array_size_in_bytes::<JDouble>(len),
-        BasicType::Byte => ArrayOopDesc::array_size_in_bytes::<JByte>(len),
-        BasicType::Short => ArrayOopDesc::array_size_in_bytes::<JShort>(len),
-        BasicType::Int => ArrayOopDesc::array_size_in_bytes::<JInt>(len),
-        BasicType::Long => ArrayOopDesc::array_size_in_bytes::<JLong>(len),
-        BasicType::Object => ArrayOopDesc::array_size_in_bytes::<JObject>(len),
-        BasicType::Array => unreachable!(),
-    };
-    JArray::new(alloc_tlab(size), class_id, len)
 }

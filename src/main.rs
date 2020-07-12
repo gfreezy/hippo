@@ -1,17 +1,4 @@
-mod class;
-mod class_loader;
-mod class_parser;
-mod code_reader;
-mod frame;
-mod gc;
-mod instruction;
-mod java_const;
-mod jenv;
-mod jthread;
-mod jvm;
-mod native;
-
-use crate::jvm::Jvm;
+use hippo::jvm::Jvm;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::BufWriter;
@@ -34,12 +21,8 @@ fn main() {
         .init();
     deadlock_detector();
 
-    let mut jvm = Jvm::new(
-        "main/Main",
-        Some("./jre".to_string()),
-        Some("./jre/lib/rt".to_string()),
-    );
-    jvm.run();
+    let mut jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+    jvm.run("main/Main");
 }
 
 fn deadlock_detector() {
