@@ -11,6 +11,10 @@ impl InstanceClassLoaderClass {
     pub fn instance_size(&self) -> usize {
         self.class.instance_size()
     }
+
+    pub fn name(&self) -> &str {
+        self.class.name()
+    }
 }
 
 impl From<InstanceClassLoaderClass> for Class {

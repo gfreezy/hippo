@@ -104,10 +104,6 @@ macro_rules! impl_instance_class {
                 self.class.interfaces()
             }
 
-            pub fn name(&self) -> &str {
-                self.class.name()
-            }
-
             pub fn iter_super_classes(&self) -> crate::class::SuperClassesIter {
                 self.class.iter_super_classes()
             }
@@ -216,6 +212,10 @@ impl InstanceClass {
     }
     pub fn instance_size(&self) -> usize {
         self.class.instance_size()
+    }
+
+    pub fn name(&self) -> &str {
+        self.class.name()
     }
 }
 

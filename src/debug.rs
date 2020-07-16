@@ -56,7 +56,7 @@ pub fn pretty_write(
 
 pub fn pretty_print(v: impl Into<RcDoc<'static>>) {
     let mut w = Vec::new();
-    pretty_write(v, 80, &mut w);
+    pretty_write(v, 80, &mut w).unwrap();
     println!("{}", String::from_utf8(w).unwrap());
 }
 

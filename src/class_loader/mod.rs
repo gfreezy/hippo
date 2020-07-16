@@ -1,8 +1,9 @@
-use crate::class::{Class, ClassId};
+use crate::class::{Class, ClassId, InstanceMirrorClass};
 use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 
 use crate::gc::global_definition::JObject;
 
+use crate::java_const::JAVA_LANG_CLASS;
 use crate::jthread::JvmThread;
 use crate::jvm::execute_class_method;
 use nom::lib::std::collections::HashMap;
@@ -111,6 +112,19 @@ pub fn load_class(loader: JObject, mut name: &str) -> Class {
     } else {
         unreachable!()
     };
+    let _class_id = register_class(class.clone(), loader.clone());
+    class
+}
+
+pub fn load_mirror_class(loader: JObject, name: &str) -> Class {
+    let mirror_class_name = InstanceMirrorClass::convert_to_mirror_class_name(
+        name.trim_start_matches('L').trim_end_matches(';'),
+    );
+    if let Some(class) = get_class_by_name(&mirror_class_name) {
+        assert_eq!(class.class_loader(), loader);
+        return class;
+    }
+    let class: Class = InstanceMirrorClass::new(name, loader).into();
     let _class_id = register_class(class.clone(), loader.clone());
     class
 }

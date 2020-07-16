@@ -14,12 +14,13 @@ use crate::gc::mem::align_usize;
 use field::descriptor_size_in_bytes;
 use method::Method;
 
-use crate::jenv::{alloc_jobject, new_java_lang_string};
+use crate::jenv::{alloc_jobject, new_java_lang_string, new_jclass};
 use field::Field;
 use nom::lib::std::collections::HashMap;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use crate::class_loader::load_mirror_class;
 use crossbeam::atomic::AtomicCell;
 use std::sync::atomic::Ordering::SeqCst;
 use tracing::trace;
@@ -127,8 +128,8 @@ impl InnerClass {
 
     pub fn mirror_class(&self) -> JObject {
         if self.mirror_class.load().is_null() {
-            let mirror_class = InstanceMirrorClass::new(self.name(), self.loader);
-            let mirror = alloc_jobject(&mirror_class.into());
+            let mirror_class = load_mirror_class(self.class_loader(), self.name());
+            let mirror = new_jclass(&mirror_class.into());
             self.mirror_class.store(mirror);
             mirror
         } else {

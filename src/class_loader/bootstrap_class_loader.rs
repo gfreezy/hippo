@@ -40,12 +40,7 @@ impl BootstrapClassLoader {
                     .read_class(class_name)
                     .unwrap_or_else(|_| panic!("read class file: {}", name));
                 let instance_class = self.define_class(class_name.to_string(), data);
-                if class_name == JAVA_LANG_CLASS {
-                    let mirror_class: InstanceMirrorClass = instance_class.into();
-                    mirror_class.into()
-                } else {
-                    instance_class.into()
-                }
+                instance_class.into()
             }
         }
     }

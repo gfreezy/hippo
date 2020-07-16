@@ -43,7 +43,7 @@ impl Drop for Jvm {
             backtraces(&*thread.borrow());
         });
 
-        dump_space();
+        // dump_space();
     }
 }
 
@@ -114,15 +114,15 @@ pub fn execute_class_method(
     }
 
     let is_native = method.is_native();
-
-    println!("----------------------");
-    println!(
-        "execute_method: {} {} {} {}",
-        class,
-        method,
-        method.descriptor(),
-        is_native
-    );
+    //
+    // println!("----------------------");
+    // println!(
+    //     "execute_method: {} {} {} {}",
+    //     class,
+    //     method,
+    //     method.descriptor(),
+    //     is_native
+    // );
     // backtraces(thread);
     let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();

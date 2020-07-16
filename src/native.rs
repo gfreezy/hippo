@@ -1,12 +1,12 @@
 #![allow(non_snake_case, unused_variables)]
 
-use crate::class::{copy_array, Class};
-use crate::class_loader::{get_class_by_id, init_class, load_class};
+use crate::class::{copy_array, Class, TypeArrayClass};
+use crate::class_loader::{get_class_by_id, get_class_id_by_name, init_class, load_class};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
 use crate::debug::pretty_print;
 use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
 use crate::gc::oop::Oop;
-use crate::gc::oop_desc::InstanceOopDesc;
+use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, TypeArrayOopDesc};
 use crate::java_const::{
     class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_REFLECT_FIELD, JAVA_LANG_STRING,
     JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP,
@@ -20,7 +20,6 @@ use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicPtr, Ordering};
-use tracing::__macro_support::AtomicUsize;
 
 pub fn java_lang_Class_getPrimitiveClass(
     thread: &mut JvmThread,
@@ -188,22 +187,37 @@ pub fn sun_misc_VM_initalize(thread: &mut JvmThread, _class: &Class, args: Vec<J
 pub fn sun_misc_Unsafe_registerNatives(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
 
 pub fn sun_misc_Unsafe_arrayBaseOffset(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
-    thread.current_frame_mut().operand_stack.push_jint(0);
+    let acls = args[1].as_jobject();
+    let mirror_class = get_class_by_id(acls.class_id());
+    println!("array base offset {:?}", mirror_class);
+    assert!(!acls.is_null());
+    let base_offset = ArrayOopDesc::base_offset_in_bytes();
+    thread.push_jint(base_offset as JInt);
 }
 
-pub fn sun_misc_Unsafe_arrayIndexScale(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
-    // todo
-    match args.as_slice() {
-        &[JValue::Object(unsafe_obj), JValue::Object(mirror)] => {}
+pub fn sun_misc_Unsafe_arrayIndexScale(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let (unsafe_obj, class_ojb) = match args.as_slice() {
+        &[JValue::Object(unsafe_obj), JValue::Object(mirror)] => (unsafe_obj, mirror),
         _ => unreachable!(),
-    }
-    thread.current_frame_mut().operand_stack.push_jint(1);
+    };
+    let mirror_class = get_class_by_id(class_ojb.class_id());
+    let instance_mirror_class = dbg!(mirror_class).as_instance_mirror_class().unwrap();
+    let scale = match load_class(
+        class.class_loader(),
+        dbg!(instance_mirror_class.mirror_name()),
+    ) {
+        Class::TypeArrayClass(c) => c.ty().size_in_bytes(),
+        Class::ObjArrayClass(_) => std::mem::size_of::<usize>(),
+        v => unreachable!("{:?}", v),
+    };
+    thread.push_jint(scale as JInt)
 }
 
 pub fn sun_misc_Unsafe_addressSize(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
-    // todo
-
-    thread.current_frame_mut().operand_stack.push_jint(8);
+    thread
+        .current_frame_mut()
+        .operand_stack
+        .push_jint(std::mem::size_of::<usize>() as JInt);
 }
 
 pub fn sun_reflect_Reflection_getCallerClass(
@@ -216,17 +230,14 @@ pub fn sun_reflect_Reflection_getCallerClass(
     } else {
         JObject::null()
     };
-    thread
-        .current_frame_mut()
-        .operand_stack
-        .push_jobject(caller_class);
+    thread.push_jobject(caller_class);
 }
 
 pub fn java_io_FileInputStream_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
-    // todo
+    // panic!()
 }
 pub fn java_io_FileDescriptor_initIDs(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
-    // todo
+    // panic!()
 }
 
 pub fn java_lang_Throwable_fillInStackTrace(
@@ -234,6 +245,7 @@ pub fn java_lang_Throwable_fillInStackTrace(
     _class: &Class,
     args: Vec<JValue>,
 ) {
+    // todo: fill backtrace
     let obj = &args[0];
     thread.current_frame_mut().operand_stack.push(obj.clone());
 }
@@ -287,14 +299,18 @@ pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, arg
 
         thread.set_thread_object(thread_object);
     }
-    thread
-        .current_frame_mut()
-        .operand_stack
-        .push_jobject(thread_object)
+    thread.push_jobject(thread_object)
 }
 
 pub fn java_lang_Class_getName0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let addr = new_java_lang_string(class.as_instance_mirror_class().mirrored_class_name());
+    let jclass = args[0].as_jobject();
+    let mirror_class = get_class_by_id(jclass.class_id());
+    let addr = new_java_lang_string(
+        mirror_class
+            .as_instance_mirror_class()
+            .unwrap()
+            .mirror_name(),
+    );
     thread.current_frame_mut().operand_stack.push_jobject(addr);
 }
 
@@ -302,10 +318,7 @@ pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Ve
     let name = get_java_string(args[0].as_jobject());
     let class_name = name.replace('.', "/");
     let class = load_class(class.class_loader(), &class_name);
-    thread
-        .current_frame_mut()
-        .operand_stack
-        .push_jobject(class.mirror_class());
+    thread.push_jobject(class.mirror_class());
 }
 
 pub fn java_security_AccessController_getStackAccessControlContext(
@@ -313,21 +326,15 @@ pub fn java_security_AccessController_getStackAccessControlContext(
     class: &Class,
     args: Vec<JValue>,
 ) {
-    thread
-        .current_frame_mut()
-        .operand_stack
-        .push_jobject(JObject::null());
+    thread.push_jobject(JObject::null());
 }
 
 pub fn java_lang_Thread_setPriority0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let thread_obj = args[0].as_jobject();
     let priority = args[1].as_jint();
-    if priority < 1 {
-        let object_ref = args[0].as_jobject();
-        let class_id = object_ref.class_id();
-        let class = get_class_by_id(class_id);
-        let field = class.get_field("priority", "I").unwrap();
-        object_ref.set_field_by_offset(field.offset(), 5);
-    }
+    set_object_field(thread_obj, "priority", "I", priority);
+    // let tid = get_object_field(thread_obj, "tid", "J");
+    // set tid
 }
 
 pub fn java_lang_Thread_isAlive(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
@@ -341,6 +348,7 @@ pub fn java_lang_Thread_start0(thread: &mut JvmThread, class: &Class, args: Vec<
     let obj = args[0].as_jobject();
     let class = class.clone();
     std::thread::spawn(move || {
+        let thread_id = thread_id::get() as i64;
         JTHREAD.with(|thread| {
             execute_method_by_name(
                 &mut thread.borrow_mut(),
@@ -351,8 +359,7 @@ pub fn java_lang_Thread_start0(thread: &mut JvmThread, class: &Class, args: Vec<
                 vec![obj.into()],
             )
         });
-        let thread_id = thread_id::get() as i64;
-        THREADS.lock().remove(&thread_id);
+        THREADS.lock().insert(thread_id);
     });
 }
 

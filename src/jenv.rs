@@ -9,7 +9,7 @@ use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
 use crate::gc::oop::Oop;
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::{alloc_tlab, occupy_remaining_tlab};
-use crate::java_const::JAVA_LANG_STRING;
+use crate::java_const::{class_name_to_descriptor, JAVA_LANG_STRING};
 use crate::jthread::JvmThread;
 use nom::lib::std::collections::HashSet;
 use once_cell::sync::{Lazy, OnceCell};
@@ -27,7 +27,7 @@ const ALIGN: usize = 8;
 fn alloc_memory(size: usize) -> Oop {
     let oop = alloc_tlab(size, ALIGN);
     oop.clear(size);
-    // print!("oop: {:?}, size: {:?}, ", oop, size);
+    print!("oop: {:?}, size: {:?}, ", oop, size);
     if let Some((occupy_oop, size)) = occupy_remaining_tlab(ALIGN) {
         let class_id = Lazy::new(|| {
             let _class = load_class(JObject::null(), "[B");
@@ -36,21 +36,25 @@ fn alloc_memory(size: usize) -> Oop {
         let base_offset = ArrayOopDesc::base_offset_in_bytes();
         let len = size - base_offset;
         let _ = JArray::new(occupy_oop, *class_id, len);
-        // println!("occupy_oop: {:?}, size: {:?}", occupy_oop, size);
+        println!("occupy_oop: {:?}, size: {:?}", occupy_oop, size);
     }
-    // println!("-------------");
+    println!("-------------");
     oop
 }
 
 pub fn alloc_jobject(class: &Class) -> JObject {
     let size = class.instance_size() + InstanceOopDesc::header_size_in_bytes();
 
-    JObject::new(alloc_memory(size), get_class_id_by_name(class.name()))
+    let jobj = JObject::new(alloc_memory(size), get_class_id_by_name(class.name()));
+    println!("alloc_jobject: {:?}, class: {:?}", jobj, class);
+    jobj
 }
 
 pub fn alloc_empty_jobject() -> JObject {
     let size = InstanceOopDesc::header_size_in_bytes();
-    JObject::new(alloc_memory(size), 0)
+    let jobj = JObject::new(alloc_memory(size), 0);
+    println!("alloc_empyt_jobj: {:?}", jobj);
+    jobj
 }
 
 pub fn alloc_jarray(ty: BasicType, class_id: ClassId, len: usize) -> JArray {
@@ -66,11 +70,17 @@ pub fn alloc_jarray(ty: BasicType, class_id: ClassId, len: usize) -> JArray {
         BasicType::Object => ArrayOopDesc::array_size_in_bytes::<JObject>(len),
         BasicType::Array => unreachable!(),
     };
-    JArray::new(alloc_memory(size), class_id, len)
+    let jarray = JArray::new(alloc_memory(size), class_id, len);
+    println!("alloc_jarray: {:?}, ty: {:?}, len: {}", jarray, ty, len);
+    jarray
 }
 
 pub fn new_jobject(class: &Class) -> JObject {
     alloc_jobject(&class)
+}
+
+pub fn new_jclass(class: &Class) -> JObject {
+    new_jobject(class)
 }
 
 pub fn new_jtype_array(basic_ty: BasicType, len: usize) -> JArray {

@@ -354,7 +354,7 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
         {
             actual_method
         } else {
-            unreachable!("no method found")
+            unreachable!("no method found: {:?}", method_ref)
         }
     } else {
         unimplemented!("is_signature_polymorphic")

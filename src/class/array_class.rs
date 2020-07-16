@@ -1,10 +1,10 @@
 use crate::class::{Class, InstanceMirrorClass};
-use crate::class_loader::get_class_by_id;
+use crate::class_loader::{get_class_by_id, load_mirror_class};
 use crate::gc::global_definition::{BasicType, JObject};
 use crate::gc::oop::ArrayOop;
 use crate::gc::oop_desc::ArrayOopDesc;
 use crate::instruction::can_cast_to;
-use crate::jenv::alloc_jobject;
+use crate::jenv::{alloc_jobject, new_jclass};
 use crate::jthread::JvmThread;
 use crossbeam::atomic::AtomicCell;
 use std::ptr::copy_nonoverlapping;
@@ -46,8 +46,8 @@ impl TypeArrayClass {
     pub fn mirror_class(&self) -> JObject {
         let mirror = self.inner.mirror_class.load();
         if mirror.is_null() {
-            let mirror_class = InstanceMirrorClass::new(self.name(), self.class_loader());
-            let mirror = alloc_jobject(&mirror_class.into());
+            let mirror_class = load_mirror_class(self.class_loader(), self.name());
+            let mirror = new_jclass(&mirror_class.into());
             self.inner.mirror_class.store(mirror);
             mirror
         } else {
@@ -95,8 +95,8 @@ impl ObjArrayClass {
     pub fn mirror_class(&self) -> JObject {
         let mirror = self.inner.mirror_class.load();
         if mirror.is_null() {
-            let mirror_class = InstanceMirrorClass::new(self.name(), self.class_loader());
-            let mirror = alloc_jobject(&mirror_class.into());
+            let mirror_class = load_mirror_class(self.class_loader(), self.name());
+            let mirror = new_jclass(&mirror_class.into());
             self.inner.mirror_class.store(mirror);
             mirror
         } else {

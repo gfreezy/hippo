@@ -48,18 +48,17 @@ impl fmt::Debug for Class {
 }
 
 impl Class {
-    pub fn as_instance_class(&self) -> InstanceClass {
+    pub fn as_instance_class(&self) -> Option<InstanceClass> {
         match self {
-            Class::InstanceClass(c) => c.clone(),
-            Class::InstanceMirrorClass(c) => c.clone().into(),
-            _ => unreachable!(),
+            Class::InstanceClass(c) => Some(c.clone()),
+            _ => None,
         }
     }
 
-    pub fn as_type_array_class(&self) -> TypeArrayClass {
+    pub fn as_type_array_class(&self) -> Option<TypeArrayClass> {
         match self {
-            Class::TypeArrayClass(c) => c.clone(),
-            _ => unreachable!(),
+            Class::TypeArrayClass(c) => Some(c.clone()),
+            _ => None,
         }
     }
 
@@ -75,10 +74,17 @@ impl Class {
         matches!(self, Class::ObjArrayClass(_))
     }
 
-    pub fn as_obj_array_class(&self) -> ObjArrayClass {
+    pub fn as_obj_array_class(&self) -> Option<ObjArrayClass> {
         match self {
-            Class::ObjArrayClass(c) => c.clone(),
-            _ => unreachable!(),
+            Class::ObjArrayClass(c) => Some(c.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn as_instance_mirror_class(&self) -> Option<InstanceMirrorClass> {
+        match self {
+            Class::InstanceMirrorClass(c) => Some(c.clone()),
+            _ => None,
         }
     }
 
@@ -449,13 +455,6 @@ impl Class {
             Class::InstanceMirrorClass(c) => c.is_subclass_of(class),
             Class::TypeArrayClass(_) => unreachable!(),
             Class::ObjArrayClass(_) => unreachable!(),
-        }
-    }
-
-    pub fn as_instance_mirror_class(&self) -> InstanceMirrorClass {
-        match self {
-            Class::InstanceMirrorClass(c) => c.clone(),
-            _ => unreachable!(),
         }
     }
 }
