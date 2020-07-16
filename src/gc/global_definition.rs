@@ -5,6 +5,9 @@ use crate::gc::mark_word::MarkWord;
 use crate::gc::oop::{ArrayOop, InstanceOop, Oop};
 
 use crate::class::ClassId;
+use crate::class_loader::get_class_by_id;
+use nom::lib::std::fmt::Formatter;
+use std::fmt;
 use std::mem::size_of;
 
 pub const HEAP_WORD_SIZE: usize = size_of::<usize>();
@@ -167,8 +170,28 @@ pub type JLong = i64;
 pub type JSize = JInt;
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct JObject(Oop);
+
+impl fmt::Debug for JObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_null() {
+            return write!(f, "JObject {{ null }}",);
+        }
+        if self.class_id() > 0 {
+            let class = get_class_by_id(self.class_id());
+            write!(
+                f,
+                "JObject {{ class: {}, oop: {:?} }}",
+                class.name(),
+                self.oop()
+            )
+        } else {
+            write!(f, "JObject {{ empty_class, oop: {:?} }}", self.oop())
+        }
+    }
+}
+
 impl JObject {
     // oop is empty, we need to initialize first
     pub fn new(mut oop: Oop, class_id: ClassId) -> Self {
@@ -290,7 +313,7 @@ impl JArray {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        assert!(i < self.len());
+        assert!(dbg!(i) < dbg!(self.len()));
         self.0.element_at(i)
     }
 

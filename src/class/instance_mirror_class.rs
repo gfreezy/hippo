@@ -4,33 +4,59 @@ use crate::gc::global_definition::JObject;
 use crate::gc::mem::align_usize;
 
 use crate::java_const::JAVA_LANG_CLASS;
+use crate::jenv::new_jclass;
+use crossbeam::atomic::AtomicCell;
 use nom::lib::std::fmt::Formatter;
 use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct InstanceMirrorClass {
     class: InstanceClass,
     base_static_offset: usize,
     mirror_class_name: String,
+    jclass: Arc<AtomicCell<JObject>>,
 }
 
 impl_instance_class!(InstanceMirrorClass);
 
 impl InstanceMirrorClass {
     pub fn new(name: &str, loader: JObject) -> Self {
-        let java_class = load_class(loader, &name);
         let class = load_class(loader, JAVA_LANG_CLASS);
-        let java_class_static_size = java_class.static_size();
         let self_instance_size = class.instance_size();
         let offset = align_usize(self_instance_size, 8);
-        class.set_instance_size(offset + java_class_static_size);
+        if !matches!(
+            name,
+            "char"
+                | "C"
+                | "int"
+                | "I"
+                | "long"
+                | "J"
+                | "float"
+                | "F"
+                | "double"
+                | "D"
+                | "short"
+                | "S"
+                | "byte"
+                | "B"
+                | "bool"
+                | "Z"
+        ) {
+            let java_class = load_class(loader, &name);
+            let java_class_static_size = java_class.static_size();
+            class.set_instance_size(offset + java_class_static_size);
+        };
+
         let mirror_class_name = Self::convert_to_mirror_class_name(name);
         InstanceMirrorClass {
             class: class.as_instance_class().unwrap(),
             base_static_offset: offset,
-            mirror_class_name: mirror_class_name,
+            mirror_class_name,
+            jclass: Arc::new(AtomicCell::new(JObject::null())),
         }
     }
 
@@ -55,6 +81,17 @@ impl InstanceMirrorClass {
 
     pub fn convert_to_mirror_class_name(name: &str) -> String {
         format!("mirror:{}", name)
+    }
+
+    pub fn mirror_class(&self) -> JObject {
+        let _ = self
+            .jclass
+            .compare_and_swap(JObject::null(), new_jclass(&self.clone().into()));
+        self.jclass.load()
+    }
+
+    pub fn base_static_offset(&self) -> usize {
+        self.base_static_offset
     }
 }
 

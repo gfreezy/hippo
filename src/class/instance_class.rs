@@ -108,10 +108,6 @@ macro_rules! impl_instance_class {
                 self.class.iter_super_classes()
             }
 
-            pub fn mirror_class(&self) -> crate::gc::global_definition::JObject {
-                self.class.mirror_class()
-            }
-
             pub fn did_implement_interface(&self, interface: crate::class::Class) -> bool {
                 self.class.did_implement_interface(interface)
             }
@@ -210,12 +206,17 @@ impl InstanceClass {
             )),
         }
     }
+
     pub fn instance_size(&self) -> usize {
         self.class.instance_size()
     }
 
     pub fn name(&self) -> &str {
         self.class.name()
+    }
+
+    pub fn mirror_class(&self) -> JObject {
+        self.class.mirror_class()
     }
 }
 

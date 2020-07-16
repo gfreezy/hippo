@@ -35,7 +35,6 @@ pub struct InnerClass {
     static_fields: HashMap<String, Field>,
     instance_fields: HashMap<String, Field>,
     methods: Vec<Method>,
-    mirror_class: AtomicCell<JObject>,
     instance_size: AtomicU64,
     static_size: usize,
     inited: AtomicBool,
@@ -117,7 +116,6 @@ impl InnerClass {
             static_fields,
             methods,
             interfaces,
-            mirror_class: AtomicCell::new(JObject::null()),
             instance_size: AtomicU64::new(instance_offset as u64),
             static_size: static_offset,
             inited: AtomicBool::new(false),
@@ -127,14 +125,8 @@ impl InnerClass {
     }
 
     pub fn mirror_class(&self) -> JObject {
-        if self.mirror_class.load().is_null() {
-            let mirror_class = load_mirror_class(self.class_loader(), self.name());
-            let mirror = new_jclass(&mirror_class.into());
-            self.mirror_class.store(mirror);
-            mirror
-        } else {
-            self.mirror_class.load()
-        }
+        let mirror_class = load_mirror_class(self.class_loader(), self.name());
+        mirror_class.mirror_class()
     }
 
     pub fn instance_size(&self) -> usize {

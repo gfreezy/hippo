@@ -264,15 +264,20 @@ pub fn getstatic(thread: &mut JvmThread, class: &Class) {
             let field = field_class
                 .get_static_field(field_ref.field_name, field_ref.descriptor)
                 .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
-            let field_offset = field.offset();
+            let jclass = field_class.mirror_class();
+            let mirror_class = get_class_by_id(jclass.class_id());
+            let field_offset = field.offset()
+                + mirror_class
+                    .as_instance_mirror_class()
+                    .unwrap()
+                    .base_static_offset();
             let basic_type = field.basic_type();
             method.set_static_field(opcode_pc, field_class.clone(), basic_type, field_offset);
 
             (field_class, basic_type, field_offset)
         };
-
-    let mirror_class = field_class.mirror_class();
-    thread.push(mirror_class.get_field_by_basic_type_and_offset(basic_type, field_offset))
+    let jclass = field_class.mirror_class();
+    thread.push(jclass.get_field_by_basic_type_and_offset(basic_type, field_offset))
 }
 
 pub fn putstatic(thread: &mut JvmThread, class: &Class) {
@@ -290,7 +295,12 @@ pub fn putstatic(thread: &mut JvmThread, class: &Class) {
             let field = field_class
                 .get_static_field(field_ref.field_name, field_ref.descriptor)
                 .unwrap_or_else(|| panic!("resolve field: {:?}", field_ref));
-            let field_offset = field.offset();
+            let jclass = get_class_by_id(field_class.mirror_class().class_id());
+            let base_static_offset = jclass
+                .as_instance_mirror_class()
+                .unwrap()
+                .base_static_offset();
+            let field_offset = field.offset() + base_static_offset;
             debug!(?field_ref, %field_offset, ?class, field=?value, "putstatic");
             let basic_type = field.basic_type();
             method.set_static_field(opcode_pc, field_class.clone(), basic_type, field_offset);

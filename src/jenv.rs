@@ -1,5 +1,7 @@
 use crate::class::{Class, ClassId, Method};
-use crate::class_loader::{get_class_by_id, get_class_id_by_name, init_class, load_class};
+use crate::class_loader::{
+    get_class_by_id, get_class_id_by_name, init_class, load_class, load_mirror_class,
+};
 
 use crate::gc::global_definition::{
     BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
@@ -27,7 +29,7 @@ const ALIGN: usize = 8;
 fn alloc_memory(size: usize) -> Oop {
     let oop = alloc_tlab(size, ALIGN);
     oop.clear(size);
-    print!("oop: {:?}, size: {:?}, ", oop, size);
+    // print!("oop: {:?}, size: {:?}, ", oop, size);
     if let Some((occupy_oop, size)) = occupy_remaining_tlab(ALIGN) {
         let class_id = Lazy::new(|| {
             let _class = load_class(JObject::null(), "[B");
@@ -36,9 +38,9 @@ fn alloc_memory(size: usize) -> Oop {
         let base_offset = ArrayOopDesc::base_offset_in_bytes();
         let len = size - base_offset;
         let _ = JArray::new(occupy_oop, *class_id, len);
-        println!("occupy_oop: {:?}, size: {:?}", occupy_oop, size);
+        // println!("occupy_oop: {:?}, size: {:?}", occupy_oop, size);
     }
-    println!("-------------");
+    // println!("-------------");
     oop
 }
 
@@ -46,14 +48,14 @@ pub fn alloc_jobject(class: &Class) -> JObject {
     let size = class.instance_size() + InstanceOopDesc::header_size_in_bytes();
 
     let jobj = JObject::new(alloc_memory(size), get_class_id_by_name(class.name()));
-    println!("alloc_jobject: {:?}, class: {:?}", jobj, class);
+    // println!("alloc_jobject: {:?}, class: {:?}", jobj, class);
     jobj
 }
 
 pub fn alloc_empty_jobject() -> JObject {
     let size = InstanceOopDesc::header_size_in_bytes();
     let jobj = JObject::new(alloc_memory(size), 0);
-    println!("alloc_empyt_jobj: {:?}", jobj);
+    // println!("alloc_empyt_jobj: {:?}", jobj);
     jobj
 }
 
@@ -95,43 +97,6 @@ pub fn new_jobject_array(class: Class, len: usize) -> JArray {
     alloc_jarray(BasicType::Object, class_id, len)
 }
 
-pub fn get_java_primitive_object(name: &str) -> JObject {
-    // todo: I L ... type
-    static PRIMITIVE_CLASSES: OnceCell<HashMap<String, JObject>> = OnceCell::new();
-    let primitive_classes = PRIMITIVE_CLASSES.get_or_init(|| {
-        let mut map = HashMap::new();
-        let int_class = alloc_empty_jobject();
-        let char_class = alloc_empty_jobject();
-        let long_class = alloc_empty_jobject();
-        let float_class = alloc_empty_jobject();
-        let double_class = alloc_empty_jobject();
-        let short_class = alloc_empty_jobject();
-        let byte_class = alloc_empty_jobject();
-        let bool_class = alloc_empty_jobject();
-        map.insert("char".to_string(), char_class);
-        map.insert("C".to_string(), char_class);
-        map.insert("int".to_string(), int_class);
-        map.insert("I".to_string(), int_class);
-        map.insert("long".to_string(), long_class);
-        map.insert("J".to_string(), long_class);
-        map.insert("float".to_string(), float_class);
-        map.insert("F".to_string(), float_class);
-        map.insert("double".to_string(), double_class);
-        map.insert("D".to_string(), double_class);
-        map.insert("short".to_string(), short_class);
-        map.insert("S".to_string(), short_class);
-        map.insert("byte".to_string(), byte_class);
-        map.insert("B".to_string(), byte_class);
-        map.insert("bool".to_string(), bool_class);
-        map.insert("Z".to_string(), bool_class);
-        map
-    });
-    primitive_classes
-        .get(name)
-        .unwrap_or_else(|| panic!("{}", name))
-        .clone()
-}
-
 pub fn get_java_class_object(thread: &mut JvmThread, loader: JObject, name: &str) -> JObject {
     let ty: BasicType = name.into();
     if ty.is_reference_type() {
@@ -139,7 +104,8 @@ pub fn get_java_class_object(thread: &mut JvmThread, loader: JObject, name: &str
         init_class(thread, &class);
         class.mirror_class()
     } else {
-        get_java_primitive_object(name)
+        let mirror_class = load_mirror_class(loader, name);
+        mirror_class.mirror_class()
     }
 }
 

@@ -1,7 +1,9 @@
 #![allow(non_snake_case, unused_variables)]
 
 use crate::class::{copy_array, Class, TypeArrayClass};
-use crate::class_loader::{get_class_by_id, get_class_id_by_name, init_class, load_class};
+use crate::class_loader::{
+    get_class_by_id, get_class_id_by_name, init_class, load_class, load_mirror_class,
+};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
 use crate::debug::pretty_print;
 use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
@@ -12,9 +14,8 @@ use crate::java_const::{
     JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP,
 };
 use crate::jenv::{
-    alloc_jobject, get_java_class_object, get_java_primitive_object, get_java_string,
-    get_object_field, new_java_lang_string, new_jobject, new_jobject_array, set_object_field,
-    JTHREAD, THREADS,
+    alloc_jobject, get_java_class_object, get_java_string, get_object_field, new_java_lang_string,
+    new_jclass, new_jobject, new_jobject_array, set_object_field, JTHREAD, THREADS,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
@@ -28,9 +29,8 @@ pub fn java_lang_Class_getPrimitiveClass(
 ) {
     let string_ref = args.pop().unwrap();
     let class_name = get_java_string(string_ref.as_jobject());
-    let primitive_class = get_java_primitive_object(&class_name);
-    let frame = thread.current_frame_mut();
-    frame.operand_stack.push_jobject(primitive_class.clone());
+    let primitive_class = load_mirror_class(class.class_loader(), &class_name);
+    thread.push_jobject(primitive_class.mirror_class());
 }
 
 pub fn java_lang_Class_getDeclaredFields0(
@@ -201,11 +201,8 @@ pub fn sun_misc_Unsafe_arrayIndexScale(thread: &mut JvmThread, class: &Class, ar
         _ => unreachable!(),
     };
     let mirror_class = get_class_by_id(class_ojb.class_id());
-    let instance_mirror_class = dbg!(mirror_class).as_instance_mirror_class().unwrap();
-    let scale = match load_class(
-        class.class_loader(),
-        dbg!(instance_mirror_class.mirror_name()),
-    ) {
+    let instance_mirror_class = mirror_class.as_instance_mirror_class().unwrap();
+    let scale = match load_class(class.class_loader(), instance_mirror_class.mirror_name()) {
         Class::TypeArrayClass(c) => c.ty().size_in_bytes(),
         Class::ObjArrayClass(_) => std::mem::size_of::<usize>(),
         v => unreachable!("{:?}", v),

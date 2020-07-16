@@ -1,4 +1,5 @@
 use crate::class::{Class, InstanceClass};
+use crate::gc::global_definition::JObject;
 
 #[derive(Clone)]
 pub struct InstanceClassLoaderClass {
@@ -14,6 +15,10 @@ impl InstanceClassLoaderClass {
 
     pub fn name(&self) -> &str {
         self.class.name()
+    }
+
+    pub fn mirror_class(&self) -> JObject {
+        self.class.mirror_class()
     }
 }
 
