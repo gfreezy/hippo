@@ -1,6 +1,6 @@
 use crate::gc::mem::align_usize;
 use crate::gc::oop::Oop;
-use std::sync::atomic::{AtomicPtr, AtomicUsize};
+use std::sync::atomic::AtomicPtr;
 use std::{fmt, mem};
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]

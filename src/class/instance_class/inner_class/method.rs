@@ -9,13 +9,35 @@ use crate::class_parser::{
 };
 use crate::gc::global_definition::{BasicType, JObject};
 
-use crate::class_parser::attribute_info::predefined_attribute::LineNumberTable;
+use crate::class_parser::attribute_info::predefined_attribute::{
+    ExceptionHandler, LineNumberTable,
+};
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub struct Method {
     inner: Arc<InnerMethod>,
+}
+
+impl Serialize for Method {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Method", 4).unwrap();
+        state.serialize_field("class", self.class_name()).unwrap();
+        state.serialize_field("name", self.name()).unwrap();
+        state
+            .serialize_field("descriptor", self.descriptor())
+            .unwrap();
+        state
+            .serialize_field("is_native", &self.is_native())
+            .unwrap();
+        state.end()
+    }
 }
 
 #[derive(Debug)]
@@ -33,6 +55,7 @@ struct InnerMethod {
     max_stack: usize,
     n_args: usize,
     code: Arc<Vec<u8>>,
+    exception_table: Vec<ExceptionHandler>,
     parameters: Vec<Parameter>,
     line_number_tables: Vec<LineNumberTable>,
     class_name: String,
@@ -75,6 +98,7 @@ impl Method {
                     descriptor: descriptor.to_string(),
                     max_locals: 0,
                     max_stack: 0,
+                    exception_table: vec![],
                     line_number_tables: vec![],
                     code: Arc::new(vec![]),
                     n_args,
@@ -91,6 +115,7 @@ impl Method {
                 .code_attr()
                 .unwrap_or_else(|| panic!("get method code attr: {}", name));
             let line_number_table = code_attr.line_number_tables();
+            let exception_table = code_attr.exception_table;
 
             Method {
                 inner: Arc::new(InnerMethod {
@@ -100,6 +125,7 @@ impl Method {
                     cp_cache: Mutex::new(CpCache::new(code_attr.code.len())),
                     max_locals: code_attr.max_locals as usize,
                     max_stack: code_attr.max_stack as usize,
+                    exception_table,
                     line_number_tables: line_number_table,
                     code: Arc::new(code_attr.code),
                     n_args,
@@ -136,6 +162,19 @@ impl Method {
             Err(0) => unreachable!(),
             Err(index) => tables[index - 1].line_number,
         })
+    }
+
+    pub fn exception_handlers_for_pc(&self, pc: usize) -> Vec<ExceptionHandler> {
+        let table = &self.inner.exception_table;
+        if table.is_empty() {
+            return vec![];
+        }
+        let pc = pc as u16;
+        table
+            .iter()
+            .filter(|t| t.start_pc <= pc && t.end_pc > pc)
+            .cloned()
+            .collect()
     }
 
     pub fn set_field(&self, pc: usize, ty: BasicType, field_index: usize) {

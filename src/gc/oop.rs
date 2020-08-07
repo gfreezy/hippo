@@ -3,8 +3,9 @@ use crate::gc::address::Address;
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, OopDesc};
 
 use crate::class::ClassId;
-use std::mem;
+use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
+use std::{fmt, mem};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(C)]
@@ -25,6 +26,12 @@ impl Oop {
     }
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+}
+
+impl Display for Oop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.address())
     }
 }
 

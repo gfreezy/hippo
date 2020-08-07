@@ -6,7 +6,8 @@ use crate::gc::oop::{ArrayOop, InstanceOop, Oop};
 
 use crate::class::ClassId;
 use crate::class_loader::get_class_by_id;
-use nom::lib::std::fmt::Formatter;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 use std::fmt;
 use std::mem::size_of;
 
@@ -192,6 +193,27 @@ impl fmt::Debug for JObject {
     }
 }
 
+impl Serialize for JObject {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("JObject", 2)?;
+        if self.is_null() {
+            state.serialize_field("class", "Null")?;
+            state.serialize_field("oop", "null")?;
+        } else if self.class_id() > 0 {
+            let class = get_class_by_id(self.class_id());
+            state.serialize_field("class", class.name())?;
+            state.serialize_field("oop", &self.oop().to_string())?;
+        } else {
+            state.serialize_field("class", "Null")?;
+            state.serialize_field("oop", &self.oop().to_string())?;
+        }
+        state.end()
+    }
+}
+
 impl JObject {
     // oop is empty, we need to initialize first
     pub fn new(mut oop: Oop, class_id: ClassId) -> Self {
@@ -313,7 +335,7 @@ impl JArray {
     where
         TypeToBasicType<T>: Into<BasicType>,
     {
-        assert!(dbg!(i) < dbg!(self.len()));
+        assert!(i < self.len());
         self.0.element_at(i)
     }
 
@@ -366,6 +388,20 @@ impl JArray {
             BasicType::Long => self.get::<JLong>(index).into(),
             BasicType::Object => self.get::<JObject>(index).into(),
             BasicType::Array => self.get::<JObject>(index).into(),
+        }
+    }
+
+    pub fn set_basic_type_value(&self, index: usize, value: JValue) {
+        match value {
+            JValue::Boolean(v) => self.set::<JBoolean>(index, v),
+            JValue::Char(v) => self.set::<JChar>(index, v),
+            JValue::Float(v) => self.set::<JFloat>(index, v),
+            JValue::Double(v) => self.set::<JDouble>(index, v),
+            JValue::Byte(v) => self.set::<JByte>(index, v),
+            JValue::Short(v) => self.set::<JShort>(index, v),
+            JValue::Int(v) => self.set::<JInt>(index, v),
+            JValue::Long(v) => self.set::<JLong>(index, v),
+            JValue::Object(v) => self.set::<JObject>(index, v),
         }
     }
 }
@@ -442,7 +478,8 @@ impl From<JLong> for JValue {
     }
 }
 
-#[derive(Clone, PartialEq, Copy, Debug)]
+#[derive(Clone, PartialEq, Copy, Debug, Serialize)]
+#[serde(untagged)]
 #[repr(C)]
 pub enum JValue {
     Boolean(JBoolean),

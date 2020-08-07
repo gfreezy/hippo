@@ -1,5 +1,5 @@
 use crate::class::{Class, InstanceClass};
-use crate::class_loader::{init_class, load_class};
+use crate::class_loader::load_class;
 use crate::gc::global_definition::JObject;
 use crate::gc::mem::align_usize;
 

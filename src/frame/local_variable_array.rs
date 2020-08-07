@@ -1,7 +1,10 @@
 use crate::gc::global_definition::{JInt, JLong, JValue};
 use nom::lib::std::fmt::Formatter;
+use serde::Serialize;
 use std::fmt;
 
+#[derive(Serialize)]
+#[serde(transparent)]
 pub struct LocalVariableArray {
     local_variables: Vec<JValue>,
 }

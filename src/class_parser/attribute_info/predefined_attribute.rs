@@ -36,12 +36,12 @@ pub fn parse_constant_value_attribute(buf: &[u8]) -> IResult<&[u8], ConstantValu
         },
     ))
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExceptionHandler {
-    start_pc: u16,
-    end_pc: u16,
-    handler_pc: u16,
-    catch_type: u16,
+    pub start_pc: u16,
+    pub end_pc: u16,
+    pub handler_pc: u16,
+    pub catch_type: u16,
 }
 
 pub fn parse_exception_handler(buf: &[u8]) -> IResult<&[u8], ExceptionHandler> {

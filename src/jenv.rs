@@ -11,19 +11,21 @@ use crate::gc::global_definition::type_to_basic_type::TypeToBasicType;
 use crate::gc::oop::Oop;
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::{alloc_tlab, occupy_remaining_tlab};
-use crate::java_const::{class_name_to_descriptor, JAVA_LANG_STRING};
+use crate::java_const::{JAVA_LANG_ARRAY_INDEX_OUT_OF_BOUNDS_EXCEPTION, JAVA_LANG_STRING};
 use crate::jthread::JvmThread;
 use nom::lib::std::collections::HashSet;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::sync::atomic::AtomicUsize;
 
 thread_local! {
     pub static JTHREAD: RefCell<JvmThread> = RefCell::new(JvmThread::new());
 }
 
 pub static THREADS: Lazy<Mutex<HashSet<i64>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+pub static FRAME_ID: AtomicUsize = AtomicUsize::new(0);
+pub static OPCODE_ID: AtomicUsize = AtomicUsize::new(0);
 
 const ALIGN: usize = 8;
 fn alloc_memory(size: usize) -> Oop {
@@ -73,7 +75,7 @@ pub fn alloc_jarray(ty: BasicType, class_id: ClassId, len: usize) -> JArray {
         BasicType::Array => unreachable!(),
     };
     let jarray = JArray::new(alloc_memory(size), class_id, len);
-    println!("alloc_jarray: {:?}, ty: {:?}, len: {}", jarray, ty, len);
+    // println!("alloc_jarray: {:?}, ty: {:?}, len: {}", jarray, ty, len);
     jarray
 }
 
@@ -107,6 +109,16 @@ pub fn get_java_class_object(thread: &mut JvmThread, loader: JObject, name: &str
         let mirror_class = load_mirror_class(loader, name);
         mirror_class.mirror_class()
     }
+}
+
+pub fn new_array_index_out_of_bounds_exception(thread: &mut JvmThread) -> JObject {
+    let class = load_class(
+        JObject::null(),
+        JAVA_LANG_ARRAY_INDEX_OUT_OF_BOUNDS_EXCEPTION,
+    );
+    init_class(thread, &class);
+    let obj = alloc_jobject(&class);
+    obj
 }
 
 pub fn new_java_lang_string(s: &str) -> JObject {

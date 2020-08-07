@@ -8,9 +8,13 @@ use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::gc::global_definition::{JChar, JInt, JObject, JValue};
 
 use crate::gc::mem::is_aligned;
-use crate::java_const::JAVA_LANG_OBJECT;
+use crate::java_const::{
+    class_name_to_descriptor, JAVA_LANG_OBJECT, JAVA_LANG_STRING, JAVA_LANG_THROWABLE,
+};
 use crate::jenv::{
-    did_override_method, new_java_lang_string, new_jobject, new_jobject_array, new_jtype_array,
+    did_override_method, get_java_string, get_object_field,
+    new_array_index_out_of_bounds_exception, new_java_lang_string, new_jobject, new_jobject_array,
+    new_jtype_array,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
@@ -153,6 +157,11 @@ pub fn aaload(thread: &mut JvmThread, class: &Class) {
 pub fn caload(thread: &mut JvmThread, class: &Class) {
     let index = thread.pop_unsigned_jint();
     let array_ref = thread.pop_jarray();
+    if index as usize >= array_ref.len() {
+        let exception = new_array_index_out_of_bounds_exception(thread);
+        thread.push_jobject(exception);
+        return athrow(thread, class);
+    }
     thread.push_jchar(array_ref.get(index as usize));
 }
 
@@ -319,6 +328,7 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
     let index = thread.read_u16();
     let method_ref = class.constant_pool().get_method_ref_at(index);
     debug!(?method_ref, "invokevirtual");
+
     let resolved_class = load_class(class.class_loader(), method_ref.class_name);
     init_class(thread, &resolved_class);
     let resolved_method = resolved_class
@@ -938,25 +948,60 @@ pub fn instanceof(thread: &mut JvmThread, class: &Class) {
 }
 
 pub fn athrow(thread: &mut JvmThread, class: &Class) {
-    panic!("throw");
-    // todo:
-    let index = thread.read_u16();
-    let class_name = class.constant_pool().get_class_name_at(index);
-    let class = load_class(class.class_loader(), class_name);
-    init_class(thread, &class);
     let obj_ref = thread.pop_jobject();
-    if obj_ref.is_null() {
-        thread.push_jint(0);
-        return;
-    }
+    assert!(!obj_ref.is_null());
+    let throwable_class = load_class(class.class_loader(), JAVA_LANG_THROWABLE);
     let obj_class_id = obj_ref.class_id();
     let obj_class = get_class_by_id(obj_class_id);
-    let v = if can_cast_to(thread, obj_class, class) {
-        1
+    assert!(can_cast_to(thread, obj_class.clone(), throwable_class));
+    let pc = thread.pc() - 1;
+    let method = thread.current_method().unwrap();
+    let handlers = method.exception_handlers_for_pc(pc);
+    println!("class: {:?}, handlers: {:?}, pc: {}", class, &handlers, pc);
+
+    let mut next_pc = 0;
+    for handler in &handlers {
+        println!("handler: {:?}", handler);
+        if handler.catch_type == 0 {
+            next_pc = handler.handler_pc;
+            break;
+        }
+        let catch_class_name = class.constant_pool().get_class_name_at(handler.catch_type);
+        let catch_class = load_class(class.class_loader(), catch_class_name);
+        init_class(thread, &catch_class);
+        println!("catch class: {:?}", catch_class);
+        if can_cast_to(thread, obj_class.clone(), catch_class) {
+            next_pc = handler.handler_pc;
+            break;
+        }
+    }
+
+    if next_pc != 0 {
+        thread.clear_stack();
+        thread.push_jobject(obj_ref);
+        thread.set_pc(next_pc as usize);
+        return;
+    }
+
+    thread.pop_frame();
+    if thread.current_frame().is_some() {
+        let message: JObject = get_object_field(
+            obj_ref,
+            "detailMessage",
+            &class_name_to_descriptor(JAVA_LANG_STRING),
+        );
+        panic!("{}", get_java_string(message));
+
+    // thread.push_jobject(obj_ref);
+    // athrow(thread, &thread.current_class().unwrap());
     } else {
-        0
-    };
-    thread.push_jint(v);
+        let message: JObject = get_object_field(
+            obj_ref,
+            "detailMessage",
+            &class_name_to_descriptor(JAVA_LANG_STRING),
+        );
+        panic!("{}", get_java_string(message));
+    }
 }
 
 pub fn tableswitch(thread: &mut JvmThread, class: &Class) {
@@ -1013,17 +1058,21 @@ pub fn lookupswitch(thread: &mut JvmThread, class: &Class) {
     for i in 0..n_pairs {
         pairs.push((thread.read_i32(), thread.read_i32()));
     }
-    pairs.sort_by_key(|(match_, offset)| *match_);
-    let key = thread.read_i32();
-    let found = pairs.binary_search_by_key(&key, |(match_, _)| *match_);
+    let key = thread.pop_jint();
+    let found = pairs.iter().find(|(match_, p_)| *match_ == key);
     let target_addr = match found {
-        Ok(i) => pairs[i].1 + opcode_addr,
-        Err(_) => default + opcode_addr,
+        Some((_, offset)) => *offset + opcode_addr,
+        None => default + opcode_addr,
     };
-    thread.set_pc(target_addr as usize);
+    thread.set_pc(dbg!(target_addr) as usize);
 
     println!(
         "opcode_addr: {}, default: {}, n_pairs: {}, pairs: {:?}, key: {}, target_addr: {}",
         opcode_addr, default, n_pairs, pairs, key, target_addr
+    );
+    let frame = thread.current_frame().unwrap();
+    println!(
+        "\tlocals: {:?}\n\toperand_stack:{:?}",
+        frame.local_variable_array, frame.operand_stack,
     );
 }

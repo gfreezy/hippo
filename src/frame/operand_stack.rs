@@ -1,6 +1,8 @@
 use crate::gc::global_definition::{JArray, JChar, JDouble, JFloat, JInt, JLong, JObject, JValue};
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(transparent)]
 pub struct OperandStack {
     stack: Vec<JValue>,
 }

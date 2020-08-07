@@ -96,10 +96,13 @@ impl JvmThread {
         Some(self.caller_frame()?.method())
     }
     pub fn pop_frame(&mut self) {
-        self.stack.frames.pop_back();
+        let _ = self.stack.frames.pop_back();
     }
     pub fn push_frame(&mut self, frame: JvmFrame) {
         self.stack.frames.push_back(frame);
+    }
+    pub fn set_opcode_id(&mut self, opcode_id: usize) {
+        self.current_frame_mut().set_opcode_id(opcode_id);
     }
 
     pub fn current_class(&self) -> Option<Class> {
@@ -131,6 +134,10 @@ impl JvmThread {
 
     pub fn set_pc(&mut self, pc: usize) {
         self.current_frame_mut().code_reader.set_pc(pc)
+    }
+
+    pub fn clear_stack(&mut self) {
+        self.operand_stack().clear()
     }
 
     pub fn push(&mut self, val: JValue) {
@@ -197,5 +204,13 @@ impl JvmThread {
 
     pub fn pop_jobject(&mut self) -> JObject {
         self.operand_stack().pop_jobject()
+    }
+
+    pub fn callstack(&self) -> Vec<Method> {
+        let mut s = Vec::new();
+        for frame in self.stack.frames.iter().rev() {
+            s.push(frame.method.clone());
+        }
+        s
     }
 }

@@ -5,13 +5,12 @@ use crate::class_loader::{init_class, load_class, BOOTSTRAP_LOADER};
 use crate::frame::JvmFrame;
 use crate::gc::global_definition::{JObject, JValue};
 
-use crate::debug::dump_space;
 use crate::instruction::opcode::show_opcode;
 use crate::instruction::*;
-use crate::jenv::JTHREAD;
+use crate::jenv::{JTHREAD, OPCODE_ID};
 use crate::jthread::JvmThread;
 use crate::native::*;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tracing::debug;
 
 pub static SPACE_SIZE: AtomicUsize = AtomicUsize::new(1024 * 1024 * 100);
@@ -115,16 +114,15 @@ pub fn execute_class_method(
 
     let is_native = method.is_native();
 
+    let callstack = thread.callstack();
     println!("----------------------");
-    println!(
-        "execute_method: {} {} {} {}",
-        class,
-        method,
-        method.descriptor(),
+    println!("execute_method: {:?}", &callstack);
+    // backtraces(thread);
+    let span = tracing::debug_span!(
+        "execute_method",
+        callstack = %serde_json::to_string(&callstack).unwrap(),
         is_native
     );
-    // backtraces(thread);
-    let span = tracing::debug_span!("execute_method", %class, %method, method_descriptor = %method.descriptor(), is_native);
     let _span = span.enter();
 
     if is_native {
@@ -136,11 +134,21 @@ pub fn execute_class_method(
     thread.push_frame(frame);
 
     while let Some(code) = thread.current_frame_mut().read_u8() {
+        let (parent_frame_id, parent_opcode_id) = thread
+            .caller_frame()
+            .map(|f| (f.id, f.opcode_id))
+            .unwrap_or((0, 0));
         let frame = thread.current_frame_mut();
+        let opcode_id = OPCODE_ID.fetch_add(1, Ordering::SeqCst);
+        frame.set_opcode_id(opcode_id);
         debug!(
+            frame_id = frame.id,
             pc = frame.pc() - 1,
+            opcode_id,
             opcode = opcode::show_opcode(code),
-            ?frame,
+            frame = %serde_json::to_string(&frame).unwrap(),
+            parent_frame_id,
+            parent_opcode_id,
             "will execute"
         );
         match code {

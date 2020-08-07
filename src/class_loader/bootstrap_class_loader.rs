@@ -1,11 +1,10 @@
 use crate::class::{Class, TypeArrayClass};
-use crate::class::{InstanceClass, InstanceMirrorClass, ObjArrayClass};
+use crate::class::{InstanceClass, ObjArrayClass};
 use crate::class_loader::class_path::ClassPath;
 use crate::class_parser::parse_class_file;
 use crate::gc::global_definition::JObject;
 
 use crate::class_loader::load_class;
-use crate::java_const::JAVA_LANG_CLASS;
 use tracing::debug;
 
 #[derive(Debug)]

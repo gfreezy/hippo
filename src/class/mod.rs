@@ -10,13 +10,14 @@ pub use self::instance_class::Method;
 pub use self::instance_class::SuperClassesIter;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
 pub use self::instance_mirror_class::InstanceMirrorClass;
-pub use crate::class::array_class::{copy_array, ObjArrayClass, TypeArrayClass};
+pub use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
 use crate::class_loader::load_class;
 use crate::class_parser::constant_pool::ConstPool;
 
 use crate::gc::global_definition::{BasicType, JObject};
 
 use crate::java_const::JAVA_LANG_OBJECT;
+use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -32,6 +33,15 @@ pub enum Class {
 impl fmt::Display for Class {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
+    }
+}
+
+impl Serialize for Class {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.name())
     }
 }
 

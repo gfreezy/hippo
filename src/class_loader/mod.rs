@@ -3,7 +3,6 @@ use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
 
 use crate::gc::global_definition::JObject;
 
-use crate::java_const::JAVA_LANG_CLASS;
 use crate::jthread::JvmThread;
 use crate::jvm::execute_class_method;
 use nom::lib::std::collections::HashMap;
@@ -107,7 +106,7 @@ pub fn load_class(loader: JObject, mut name: &str) -> Class {
         return class;
     }
     let class = if loader.is_null() {
-        let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstarap_loader");
+        let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstrap_loader");
         boot_loader.load_class(name)
     } else {
         unreachable!()

@@ -2,7 +2,7 @@ pub mod cp_cache;
 pub mod field;
 pub mod method;
 
-use crate::class::{Class, InstanceMirrorClass};
+use crate::class::Class;
 use crate::class_parser::constant_pool::ConstPool;
 use crate::class_parser::field_info::FieldInfo;
 use crate::class_parser::{
@@ -14,14 +14,13 @@ use crate::gc::mem::align_usize;
 use field::descriptor_size_in_bytes;
 use method::Method;
 
-use crate::jenv::{alloc_jobject, new_java_lang_string, new_jclass};
+use crate::jenv::new_java_lang_string;
 use field::Field;
 use nom::lib::std::collections::HashMap;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::class_loader::load_mirror_class;
-use crossbeam::atomic::AtomicCell;
 use std::sync::atomic::Ordering::SeqCst;
 use tracing::trace;
 

@@ -1,26 +1,23 @@
 #![allow(non_snake_case, unused_variables)]
 
-use crate::class::{copy_array, Class, TypeArrayClass};
-use crate::class_loader::{
-    get_class_by_id, get_class_id_by_name, init_class, load_class, load_mirror_class,
-};
+use crate::class::Class;
+use crate::class_loader::{get_class_by_id, init_class, load_class, load_mirror_class};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
 use crate::debug::pretty_print;
 use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
-use crate::gc::oop::Oop;
-use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc, TypeArrayOopDesc};
+use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
+use crate::instruction::can_cast_to;
 use crate::java_const::{
     class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_REFLECT_FIELD, JAVA_LANG_STRING,
     JAVA_LANG_THREAD, JAVA_LANG_THREAD_GROUP,
 };
 use crate::jenv::{
     alloc_jobject, get_java_class_object, get_java_string, get_object_field, new_java_lang_string,
-    new_jclass, new_jobject, new_jobject_array, set_object_field, JTHREAD, THREADS,
+    new_jobject, new_jobject_array, set_object_field, JTHREAD, THREADS,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
-use std::convert::TryInto;
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::Ordering;
 
 pub fn java_lang_Class_getPrimitiveClass(
     thread: &mut JvmThread,
@@ -371,27 +368,9 @@ pub fn sun_misc_Unsafe_compareAndSwapObject(
         }
         _ => unreachable!(),
     };
-    let success = compare_and_swap_object(unsafe_obj, *offset, e, x);
+    let success = compare_and_swap_object(p, *offset, e, x);
+    assert!(success);
     thread.push_jbool(success)
-}
-
-pub fn java_lang_System_arraycopy(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let (src, src_pos, dst, dst_pos, length) = match args.as_slice() {
-        &[JValue::Object(src), JValue::Int(src_pos), JValue::Object(dst), JValue::Int(dst_pos), JValue::Int(length)] => {
-            (src, src_pos, dst, dst_pos, length)
-        }
-        _ => unreachable!(),
-    };
-    let src_array: JArray = src.into();
-    let dst_array: JArray = dst.into();
-    copy_array(
-        thread,
-        src_array.array_oop(),
-        src_pos.try_into().unwrap(),
-        dst_array.array_oop(),
-        dst_pos.try_into().unwrap(),
-        length.try_into().unwrap(),
-    );
 }
 
 fn compare_and_swap_object(obj: &JObject, offset: i64, expect: &JObject, target: &JObject) -> bool {
@@ -412,15 +391,52 @@ fn compare_and_swap_object(obj: &JObject, offset: i64, expect: &JObject, target:
     success
 }
 
+pub fn java_lang_System_arraycopy(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    let (src, src_pos, dst, dst_pos, length) = match args.as_slice() {
+        &[JValue::Object(src), JValue::Int(src_pos), JValue::Object(dst), JValue::Int(dst_pos), JValue::Int(length)] => {
+            (
+                src,
+                src_pos as usize,
+                dst,
+                dst_pos as usize,
+                length as usize,
+            )
+        }
+        _ => unreachable!(),
+    };
+    let src_array: JArray = src.into();
+    let dst_array: JArray = dst.into();
+
+    assert!((length + src_pos) <= src_array.len() || (length + dst_pos) <= dst_array.len());
+    let src_class = get_class_by_id(src_array.class_id());
+    let dst_class = get_class_by_id(dst_array.class_id());
+    if length == 0 {
+        return;
+    }
+    let check_passed = can_cast_to(thread, src_class.clone(), dst_class.clone());
+
+    let src_el_type = src_class.element_type();
+    let dst_el_type = dst_class.element_type();
+    for i in 0..length {
+        let el = src_array.get_with_basic_type(src_el_type, src_pos + i);
+        if !check_passed && !can_cast_to(thread, get_class_by_id(el.class_id()), dst_class.clone())
+        {
+            panic!("partial copy");
+        }
+        dst_array.set_basic_type_value(dst_pos + i, el);
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::java_lang_System_arraycopy;
     use crate::class_loader::load_class;
     use crate::debug::pretty_print;
-    use crate::gc::global_definition::{BasicType, JArray, JObject};
+    use crate::gc::global_definition::{BasicType, JArray, JChar, JObject, JValue};
     use crate::gc::oop::Oop;
     use crate::gc::oop_desc::InstanceOopDesc;
     use crate::java_const::JAVA_LANG_STRING;
-    use crate::jenv::{alloc_jobject, new_java_lang_string, new_jtype_array};
+    use crate::jenv::{alloc_jobject, new_java_lang_string, new_jtype_array, JTHREAD};
     use crate::jvm::Jvm;
     use crate::native::compare_and_swap_object;
     use std::sync::atomic::{AtomicPtr, Ordering};
@@ -442,5 +458,39 @@ mod tests {
         let ret = compare_and_swap_object(&obj, f.offset() as i64, &expect.into(), &target.into());
         assert_eq!(obj.get_field_by_offset::<JArray>(f.offset()), target);
         assert!(ret);
+    }
+
+    #[test]
+    fn test_copy_array() {
+        let _jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        let bytes_str: Vec<u16> = "-----hello".encode_utf16().collect();
+        let src = new_jtype_array(BasicType::Char, bytes_str.len());
+        src.copy_from(&bytes_str);
+        let bytes_str2: Vec<u16> = "+++++world".encode_utf16().collect();
+        let dst = new_jtype_array(BasicType::Char, bytes_str.len());
+        dst.copy_from(&bytes_str2);
+        let class = load_class(JObject::null(), JAVA_LANG_STRING);
+
+        let src_pos = 4;
+        let dest_pos = 5;
+        let length = 5;
+        JTHREAD.with(|t| {
+            let thread = &mut *t.borrow_mut();
+            java_lang_System_arraycopy(
+                thread,
+                &class,
+                vec![
+                    src.into(),
+                    JValue::Int(src_pos as i32),
+                    dst.into(),
+                    JValue::Int(dest_pos as i32),
+                    JValue::Int(length as i32),
+                ],
+            );
+            assert_eq!(
+                &src.as_slice::<JChar>()[src_pos..src_pos + length],
+                &dst.as_slice::<JChar>()[dest_pos..dest_pos + length]
+            );
+        });
     }
 }
