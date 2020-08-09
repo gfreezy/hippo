@@ -11,3 +11,4 @@ pub mod jenv;
 pub mod jthread;
 pub mod jvm;
 pub mod native;
+pub mod string_table;

@@ -22,30 +22,34 @@ pub struct InstanceMirrorClass {
 
 impl_instance_class!(InstanceMirrorClass);
 
+pub fn is_primitive_class(name: &str) -> bool {
+    matches!(
+        name,
+        "char"
+            | "C"
+            | "int"
+            | "I"
+            | "long"
+            | "J"
+            | "float"
+            | "F"
+            | "double"
+            | "D"
+            | "short"
+            | "S"
+            | "byte"
+            | "B"
+            | "bool"
+            | "Z"
+    )
+}
+
 impl InstanceMirrorClass {
     pub fn new(name: &str, loader: JObject) -> Self {
         let class = load_class(loader, JAVA_LANG_CLASS);
         let self_instance_size = class.instance_size();
         let offset = align_usize(self_instance_size, 8);
-        if !matches!(
-            name,
-            "char"
-                | "C"
-                | "int"
-                | "I"
-                | "long"
-                | "J"
-                | "float"
-                | "F"
-                | "double"
-                | "D"
-                | "short"
-                | "S"
-                | "byte"
-                | "B"
-                | "bool"
-                | "Z"
-        ) {
+        if !is_primitive_class(name) {
             let java_class = load_class(loader, &name);
             let java_class_static_size = java_class.static_size();
             class.set_instance_size(offset + java_class_static_size);

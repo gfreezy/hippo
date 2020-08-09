@@ -13,6 +13,7 @@ use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::gc::tlab::{alloc_tlab, occupy_remaining_tlab};
 use crate::java_const::{JAVA_LANG_ARRAY_INDEX_OUT_OF_BOUNDS_EXCEPTION, JAVA_LANG_STRING};
 use crate::jthread::JvmThread;
+use crate::string_table::StringTable;
 use nom::lib::std::collections::HashSet;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -26,6 +27,7 @@ thread_local! {
 pub static THREADS: Lazy<Mutex<HashSet<i64>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 pub static FRAME_ID: AtomicUsize = AtomicUsize::new(0);
 pub static OPCODE_ID: AtomicUsize = AtomicUsize::new(0);
+pub static STRING_MAP: Lazy<StringTable> = Lazy::new(|| StringTable::new());
 
 const ALIGN: usize = 8;
 fn alloc_memory(size: usize) -> Oop {
@@ -122,6 +124,9 @@ pub fn new_array_index_out_of_bounds_exception(thread: &mut JvmThread) -> JObjec
 }
 
 pub fn new_java_lang_string(s: &str) -> JObject {
+    if let Some(j) = STRING_MAP.get(s) {
+        return j;
+    }
     let bytes_str: Vec<u16> = s.encode_utf16().collect();
     let array = new_jtype_array(BasicType::Char, bytes_str.len());
     array.copy_from(&bytes_str);
@@ -129,6 +134,7 @@ pub fn new_java_lang_string(s: &str) -> JObject {
     let obj = alloc_jobject(&class);
     let f = class.get_field("value", "[C").unwrap();
     obj.set_field_by_offset(f.offset(), array);
+    STRING_MAP.intern(s, obj);
     obj
 }
 

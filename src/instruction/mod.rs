@@ -990,7 +990,11 @@ pub fn athrow(thread: &mut JvmThread, class: &Class) {
             "detailMessage",
             &class_name_to_descriptor(JAVA_LANG_STRING),
         );
-        panic!("{}", get_java_string(message));
+        panic!(
+            "exception: {:?}, message: {}",
+            obj_ref,
+            get_java_string(message)
+        );
 
     // thread.push_jobject(obj_ref);
     // athrow(thread, &thread.current_class().unwrap());
@@ -1064,15 +1068,15 @@ pub fn lookupswitch(thread: &mut JvmThread, class: &Class) {
         Some((_, offset)) => *offset + opcode_addr,
         None => default + opcode_addr,
     };
-    thread.set_pc(dbg!(target_addr) as usize);
+    thread.set_pc(target_addr as usize);
 
-    println!(
-        "opcode_addr: {}, default: {}, n_pairs: {}, pairs: {:?}, key: {}, target_addr: {}",
-        opcode_addr, default, n_pairs, pairs, key, target_addr
-    );
-    let frame = thread.current_frame().unwrap();
-    println!(
-        "\tlocals: {:?}\n\toperand_stack:{:?}",
-        frame.local_variable_array, frame.operand_stack,
-    );
+    // println!(
+    //     "opcode_addr: {}, default: {}, n_pairs: {}, pairs: {:?}, key: {}, target_addr: {}",
+    //     opcode_addr, default, n_pairs, pairs, key, target_addr
+    // );
+    // let frame = thread.current_frame().unwrap();
+    // println!(
+    //     "\tlocals: {:?}\n\toperand_stack:{:?}",
+    //     frame.local_variable_array, frame.operand_stack,
+    // );
 }

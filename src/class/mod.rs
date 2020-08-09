@@ -9,7 +9,7 @@ pub use self::instance_class::InstanceClass;
 pub use self::instance_class::Method;
 pub use self::instance_class::SuperClassesIter;
 pub use self::instance_class_loader_class::InstanceClassLoaderClass;
-pub use self::instance_mirror_class::InstanceMirrorClass;
+pub use self::instance_mirror_class::{is_primitive_class, InstanceMirrorClass};
 pub use crate::class::array_class::{ObjArrayClass, TypeArrayClass};
 use crate::class_loader::load_class;
 use crate::class_parser::constant_pool::ConstPool;
@@ -53,7 +53,17 @@ impl PartialEq for Class {
 
 impl fmt::Debug for Class {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Class{{ name: {}}}", self.name())
+        match self {
+            Class::InstanceClass(_) => write!(f, "InstanceClass{{ name: {}}}", self.name()),
+            Class::InstanceClassLoaderClass(_) => {
+                write!(f, "InstanceClassLoaderClass{{ name: {}}}", self.name())
+            }
+            Class::InstanceMirrorClass(_) => {
+                write!(f, "InstanceMirrorClass{{ name: {}}}", self.name())
+            }
+            Class::TypeArrayClass(_) => write!(f, "TypeArrayClass{{ name: {}}}", self.name()),
+            Class::ObjArrayClass(_) => write!(f, "ObjArrayClass{{ name: {}}}", self.name()),
+        }
     }
 }
 

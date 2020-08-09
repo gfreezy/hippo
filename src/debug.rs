@@ -152,7 +152,6 @@ mod tests {
     use super::*;
     use crate::jenv::new_java_lang_string;
     use crate::jvm::Jvm;
-    use std::io::stdout;
 
     #[test]
     fn test_pretty_print_jobject() {

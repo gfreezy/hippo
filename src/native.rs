@@ -1,9 +1,8 @@
 #![allow(non_snake_case, unused_variables)]
 
-use crate::class::Class;
+use crate::class::{is_primitive_class, Class};
 use crate::class_loader::{get_class_by_id, init_class, load_class, load_mirror_class};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
-use crate::debug::pretty_print;
 use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::instruction::can_cast_to;
@@ -13,7 +12,7 @@ use crate::java_const::{
 };
 use crate::jenv::{
     alloc_jobject, get_java_class_object, get_java_string, get_object_field, new_java_lang_string,
-    new_jobject, new_jobject_array, set_object_field, JTHREAD, THREADS,
+    new_jobject, new_jobject_array, set_object_field, JTHREAD, STRING_MAP, THREADS,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
@@ -30,6 +29,23 @@ pub fn java_lang_Class_getPrimitiveClass(
     thread.push_jobject(primitive_class.mirror_class());
 }
 
+pub fn java_lang_Class_isPrimitive(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let jclass = args[0].as_jobject();
+    let mirror_class = get_class_by_id(jclass.class_id())
+        .as_instance_mirror_class()
+        .unwrap();
+    thread.push_jbool(is_primitive_class(mirror_class.mirror_name()));
+}
+
+pub fn java_lang_Class_isAssignableFrom(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let self_class = args[0].as_jobject();
+    let from_class = args[1].as_jobject();
+    let self_mirror_class = get_class_by_id(self_class.class_id())
+        .as_instance_mirror_class()
+        .unwrap();
+    // todo
+}
+
 pub fn java_lang_Class_getDeclaredFields0(
     thread: &mut JvmThread,
     class: &Class,
@@ -37,13 +53,28 @@ pub fn java_lang_Class_getDeclaredFields0(
 ) {
     let obj = args[0].as_jobject();
     let public_only = args[1].as_jbool();
-    let class = get_class_by_id(obj.class_id());
+    let obj_array = class_get_declared_fields(thread, class.class_loader(), obj, public_only);
+    thread.push_jarray(obj_array);
+}
 
+fn class_get_declared_fields(
+    thread: &mut JvmThread,
+    class_loader: JObject,
+    obj: JObject,
+    public_only: bool,
+) -> JArray {
+    let mirror_class = get_class_by_id(obj.class_id())
+        .as_instance_mirror_class()
+        .unwrap();
+
+    let class_name = mirror_class.mirror_name();
+    let class = load_class(class_loader, class_name);
     let fields: Vec<_> = if public_only {
         class.iter_fields().filter(|f| f.is_public()).collect()
     } else {
         class.iter_fields().collect()
     };
+
     let reflect_field_class = load_class(class.class_loader(), JAVA_LANG_REFLECT_FIELD);
     init_class(thread, &reflect_field_class);
     let obj_array = new_jobject_array(reflect_field_class.clone(), fields.len());
@@ -56,7 +87,7 @@ pub fn java_lang_Class_getDeclaredFields0(
             &class_name_to_descriptor(JAVA_LANG_CLASS),
             class.mirror_class(),
         );
-        set_object_field(field_obj, "slot", "I", i as JInt);
+        set_object_field(field_obj, "slot", "I", f.offset() as JInt);
         set_object_field(
             field_obj,
             "name",
@@ -82,9 +113,7 @@ pub fn java_lang_Class_getDeclaredFields0(
 
         obj_array.set(i, field_obj);
     }
-    println!("declared fields");
-    pretty_print(obj_array);
-    thread.push_jarray(obj_array);
+    obj_array
 }
 
 pub fn jvm_desiredAssertionStatus0(thread: &mut JvmThread, _class: &Class, _args: Vec<JValue>) {
@@ -186,7 +215,6 @@ pub fn sun_misc_Unsafe_registerNatives(thread: &mut JvmThread, _class: &Class, a
 pub fn sun_misc_Unsafe_arrayBaseOffset(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
     let acls = args[1].as_jobject();
     let mirror_class = get_class_by_id(acls.class_id());
-    println!("array base offset {:?}", mirror_class);
     assert!(!acls.is_null());
     let base_offset = ArrayOopDesc::base_offset_in_bytes();
     thread.push_jint(base_offset as JInt);
@@ -427,11 +455,30 @@ pub fn java_lang_System_arraycopy(thread: &mut JvmThread, _class: &Class, args: 
     }
 }
 
+pub fn java_lang_String_intern(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    let jobj = args[0].as_jobject();
+    let s = get_java_string(jobj);
+    let intern_jobj = STRING_MAP.intern(&s, jobj);
+    thread.push_jobject(intern_jobj);
+}
+
+pub fn sun_misc_Unsafe_objectFieldOffset(
+    thread: &mut JvmThread,
+    current_class: &Class,
+    args: Vec<JValue>,
+) {
+    let field = args[1].as_jobject();
+    let offset: JInt = get_object_field(field, "slot", "I");
+    thread.push_jlong(offset as JLong);
+}
+
 #[cfg(test)]
 mod tests {
     use super::java_lang_System_arraycopy;
+    use super::*;
     use crate::class_loader::load_class;
     use crate::debug::pretty_print;
+    use crate::frame::JvmFrame;
     use crate::gc::global_definition::{BasicType, JArray, JChar, JObject, JValue};
     use crate::gc::oop::Oop;
     use crate::gc::oop_desc::InstanceOopDesc;
@@ -439,11 +486,26 @@ mod tests {
     use crate::jenv::{alloc_jobject, new_java_lang_string, new_jtype_array, JTHREAD};
     use crate::jvm::Jvm;
     use crate::native::compare_and_swap_object;
+    use fxhash::FxHashSet;
+    use std::collections::HashSet;
     use std::sync::atomic::{AtomicPtr, Ordering};
+
+    fn setup_jvm() -> Jvm {
+        let jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        JTHREAD.with(|t| {
+            let thread = &mut *t.borrow_mut();
+            let class = load_class(JObject::null(), JAVA_LANG_THREAD);
+            let method = class.get_method("run", "()V", false).unwrap();
+            let frame = JvmFrame::new_with_args(class, method.clone(), vec![]);
+            thread.push_frame(frame);
+            thread.set_pc(10);
+        });
+        jvm
+    }
 
     #[test]
     fn test_compare_and_swap_object() {
-        let _jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        let _jvm = setup_jvm();
         let bytes_str: Vec<u16> = "hello".encode_utf16().collect();
         let expect = new_jtype_array(BasicType::Char, bytes_str.len());
         expect.copy_from(&bytes_str);
@@ -462,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_copy_array() {
-        let _jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        let _jvm = setup_jvm();
         let bytes_str: Vec<u16> = "-----hello".encode_utf16().collect();
         let src = new_jtype_array(BasicType::Char, bytes_str.len());
         src.copy_from(&bytes_str);
@@ -491,6 +553,102 @@ mod tests {
                 &src.as_slice::<JChar>()[src_pos..src_pos + length],
                 &dst.as_slice::<JChar>()[dest_pos..dest_pos + length]
             );
+        });
+    }
+
+    #[test]
+    fn test_java_lang_Class_getDeclaredFields0() {
+        let _jvm = setup_jvm();
+        JTHREAD.with(|t| {
+            let thread = &mut *t.borrow_mut();
+            let class = load_class(JObject::null(), JAVA_LANG_THREAD);
+            let jarray = class_get_declared_fields(
+                thread,
+                class.class_loader(),
+                class.mirror_class().into(),
+                false,
+            );
+            let mut fields = HashSet::new();
+            for field in jarray.as_slice::<JObject>() {
+                let jname: JObject =
+                    get_object_field(*field, "name", &class_name_to_descriptor(JAVA_LANG_STRING));
+                let name = get_java_string(jname);
+                fields.insert(name);
+            }
+            let mut expected = HashSet::new();
+            for s in &[
+                "blockerLock",
+                "threadLocalRandomSeed",
+                "inheritableThreadLocals",
+                "blocker",
+                "group",
+                "nativeParkEventPointer",
+                "stillborn",
+                "stackSize",
+                "threadLocals",
+                "name",
+                "tid",
+                "contextClassLoader",
+                "uncaughtExceptionHandler",
+                "eetop",
+                "threadStatus",
+                "threadQ",
+                "target",
+                "daemon",
+                "priority",
+                "threadLocalRandomProbe",
+                "inheritedAccessControlContext",
+                "threadLocalRandomSecondarySeed",
+                "parkBlocker",
+                "single_step",
+                "MIN_PRIORITY",
+                "defaultUncaughtExceptionHandler",
+                "threadInitNumber",
+                "SUBCLASS_IMPLEMENTATION_PERMISSION",
+                "MAX_PRIORITY",
+                "EMPTY_STACK_TRACE",
+                "NORM_PRIORITY",
+                "threadSeqNumber",
+            ] {
+                expected.insert(s.to_string());
+            }
+
+            assert_eq!(fields, expected);
+        })
+    }
+
+    #[test]
+    fn test_sun_misc_Unsafe_objectFieldOffset() {
+        let _jvm = setup_jvm();
+        JTHREAD.with(|t| {
+            let thread = &mut *t.borrow_mut();
+            let class = load_class(JObject::null(), JAVA_LANG_THREAD);
+            let jarray = class_get_declared_fields(
+                thread,
+                class.class_loader(),
+                class.mirror_class().into(),
+                false,
+            );
+            let group_field = jarray
+                .as_slice::<JObject>()
+                .iter()
+                .find(|field| {
+                    let jname: JObject = get_object_field(
+                        **field,
+                        "name",
+                        &class_name_to_descriptor(JAVA_LANG_STRING),
+                    );
+                    let name = get_java_string(jname);
+                    name == "group"
+                })
+                .unwrap();
+            sun_misc_Unsafe_objectFieldOffset(
+                thread,
+                &class,
+                vec![JObject::null().into(), (*group_field).into()],
+            );
+            let offset = thread.pop_jint();
+            assert_eq!(offset, 64);
         });
     }
 }

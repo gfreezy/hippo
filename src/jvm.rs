@@ -115,8 +115,8 @@ pub fn execute_class_method(
     let is_native = method.is_native();
 
     let callstack = thread.callstack();
-    println!("----------------------");
-    println!("execute_method: {:?}", &callstack);
+    // println!("----------------------");
+    // println!("execute_method: {:?}", &callstack);
     // backtraces(thread);
     let span = tracing::debug_span!(
         "execute_method",
@@ -645,6 +645,18 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
         }
         ("java/lang/System", "arraycopy", "(Ljava/lang/Object;ILjava/lang/Object;II)V") => {
             java_lang_System_arraycopy(thread, class, args);
+        }
+        ("java/lang/String", "intern", "()Ljava/lang/String;") => {
+            java_lang_String_intern(thread, class, args);
+        }
+        ("sun/misc/Unsafe", "objectFieldOffset", "(Ljava/lang/reflect/Field;)J") => {
+            sun_misc_Unsafe_objectFieldOffset(thread, class, args);
+        }
+        ("java/lang/Class", "isPrimitive", "()Z") => {
+            java_lang_Class_isPrimitive(thread, class, args);
+        }
+        ("java/lang/Class", "isAssignableFrom", "(Ljava/lang/Class;)Z") => {
+            java_lang_Class_isAssignableFrom(thread, class, args);
         }
         (class_name, name, descriptor) => {
             panic!(

@@ -39,6 +39,7 @@ impl GlobalClasses {
 lazy_static::lazy_static! {
     static ref GLOBAL_CLASSES: GlobalClasses = GlobalClasses::new();
 }
+
 pub static BOOTSTRAP_LOADER: OnceCell<BootstrapClassLoader> = OnceCell::new();
 
 pub fn get_class_by_id(id: ClassId) -> Class {
