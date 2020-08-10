@@ -166,6 +166,40 @@ where
     obj.get_field_by_offset::<T>(f.offset())
 }
 
+pub fn set_static_field<T>(class: &Class, name: &str, descriptor: &str, value: T)
+where
+    TypeToBasicType<T>: Into<BasicType>,
+{
+    let field = class
+        .get_static_field(name, descriptor)
+        .unwrap_or_else(|| panic!("resolve field: {:?}", name));
+    let jclass = class.mirror_class();
+    let mirror_class = get_class_by_id(jclass.class_id());
+    let offset = field.offset()
+        + mirror_class
+            .as_instance_mirror_class()
+            .unwrap()
+            .base_static_offset();
+    jclass.set_field_by_offset(offset, value);
+}
+
+pub fn get_static_field<T>(class: &Class, name: &str, descriptor: &str) -> T
+where
+    TypeToBasicType<T>: Into<BasicType>,
+{
+    let field = class
+        .get_static_field(name, descriptor)
+        .unwrap_or_else(|| panic!("resolve field: {:?}", name));
+    let jclass = class.mirror_class();
+    let mirror_class = get_class_by_id(jclass.class_id());
+    let offset = field.offset()
+        + mirror_class
+            .as_instance_mirror_class()
+            .unwrap()
+            .base_static_offset();
+    jclass.get_field_by_offset(offset)
+}
+
 pub fn did_override_method(method: &Method, other: &Method) -> bool {
     if method == other {
         return true;

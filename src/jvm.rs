@@ -170,6 +170,9 @@ pub fn execute_class_method(
             opcode::ICONST_5 => {
                 iconst_n(thread, &class, 5);
             }
+            opcode::ICONST_M1 => {
+                iconst_n(thread, &class, -1);
+            }
             opcode::LCONST_0 => {
                 lconst_n(thread, &class, 0);
             }
@@ -442,6 +445,10 @@ pub fn execute_class_method(
             opcode::LDC2_W => {
                 ldc2_w(thread, &class);
             }
+            opcode::LDC_W => {
+                ldc_w(thread, &class);
+            }
+
             opcode::SIPUSH => {
                 sipush(thread, &class);
             }
@@ -658,13 +665,32 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
         ("java/lang/Class", "isAssignableFrom", "(Ljava/lang/Class;)Z") => {
             java_lang_Class_isAssignableFrom(thread, class, args);
         }
+        ("java/lang/System", "setIn0", "(Ljava/io/InputStream;)V") => {
+            java_lang_System_setIn0(thread, class, args);
+        }
+        ("java/lang/System", "setOut0", "(Ljava/io/PrintStream;)V") => {
+            java_lang_System_setOut0(thread, class, args);
+        }
+        ("java/lang/System", "setErr0", "(Ljava/io/PrintStream;)V") => {
+            java_lang_System_setErr0(thread, class, args);
+        }
+        ("sun/misc/Unsafe", "getIntVolatile", "(Ljava/lang/Object;J)I") => {
+            sun_misc_Unsafe_getIntVolatile(thread, class, args);
+        }
+        ("sun/misc/Unsafe", "compareAndSwapInt", "(Ljava/lang/Object;JII)Z") => {
+            sun_misc_Unsafe_compareAndSwapInt(thread, class, args);
+        }
         (class_name, name, descriptor) => {
             panic!(
-                r#"native method: ("{}", "{}", "{}") is_static: {}"#,
+                r#"native method: is_static: {}, ("{}", "{}", "{}") => {{
+                    {}_{}(thread, class, args);
+                }}"#,
+                method.is_static(),
                 class_name,
                 name,
                 descriptor,
-                method.is_static()
+                class_name.replace("/", "_"),
+                name,
             );
         }
     };

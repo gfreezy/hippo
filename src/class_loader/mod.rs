@@ -51,6 +51,13 @@ pub fn get_class_by_id(id: ClassId) -> Class {
         .clone()
 }
 
+pub fn get_class_from_jclass(loader: JObject, class: JObject) -> Class {
+    let mirror_class = get_class_by_id(class.class_id())
+        .as_instance_mirror_class()
+        .unwrap();
+    load_class(loader, mirror_class.mirror_name())
+}
+
 pub fn get_class_id_by_name(name: &str) -> ClassId {
     let g = GLOBAL_CLASSES.inner.read();
     *g.map.get(name).unwrap()

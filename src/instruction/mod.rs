@@ -7,14 +7,16 @@ use crate::class_loader::{get_class_by_id, init_class, load_class};
 use crate::class_parser::constant_pool::ConstPoolInfo;
 use crate::gc::global_definition::{JChar, JInt, JObject, JValue};
 
+use crate::class_parser::descriptor::method_descriptor;
 use crate::gc::mem::is_aligned;
 use crate::java_const::{
-    class_name_to_descriptor, JAVA_LANG_OBJECT, JAVA_LANG_STRING, JAVA_LANG_THROWABLE,
+    class_name_to_descriptor, JAVA_LANG_CLASS, JAVA_LANG_INVOKE_METHOD_TYPE, JAVA_LANG_OBJECT,
+    JAVA_LANG_STRING, JAVA_LANG_THROWABLE,
 };
 use crate::jenv::{
     did_override_method, get_java_string, get_object_field,
     new_array_index_out_of_bounds_exception, new_java_lang_string, new_jobject, new_jobject_array,
-    new_jtype_array,
+    new_jtype_array, set_object_field,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::execute_method;
@@ -857,6 +859,62 @@ pub fn ldc2_w(thread: &mut JvmThread, class: &Class) {
     let n = match class.constant_pool().get_const_pool_info_at(offset) {
         ConstPoolInfo::ConstantLongInfo(n) => JValue::Long(*n),
         ConstPoolInfo::ConstantDoubleInfo(n) => JValue::Double(*n),
+        _ => unreachable!(),
+    };
+    thread.push(n);
+}
+
+pub fn ldc_w(thread: &mut JvmThread, class: &Class) {
+    let offset = thread.read_u16();
+    let const_pool = class.constant_pool();
+    let pool_info = const_pool.get_const_pool_info_at(offset).clone();
+    let n = match pool_info {
+        ConstPoolInfo::ConstantIntegerInfo(n) => JValue::Int(n),
+        ConstPoolInfo::ConstantFloatInfo(n) => JValue::Float(n),
+        ConstPoolInfo::ConstantStringInfo { string_index } => {
+            let s = const_pool.get_utf8_string_at(string_index);
+            new_java_lang_string(s).into()
+        }
+        ConstPoolInfo::ConstantClassInfo { name_index } => {
+            let name = const_pool.get_utf8_string_at(name_index);
+            let named_class = load_class(class.class_loader(), name);
+            init_class(thread, &named_class);
+            named_class.mirror_class().into()
+        }
+        ConstPoolInfo::ConstantMethodTypeInfo { descriptor_index } => {
+            let descriptor = const_pool.get_utf8_string_at(descriptor_index);
+            let (_, (ptypes, rtype)) = method_descriptor(descriptor).unwrap();
+            let method_type_class = load_class(class.class_loader(), JAVA_LANG_INVOKE_METHOD_TYPE);
+            init_class(thread, &method_type_class);
+            let method_type = new_jobject(&method_type_class);
+            let rtype_class = load_class(class.class_loader(), &rtype);
+            init_class(thread, &rtype_class);
+            set_object_field(
+                method_type,
+                "rtype",
+                &class_name_to_descriptor(JAVA_LANG_CLASS),
+                rtype_class.mirror_class(),
+            );
+            let class_class = load_class(class.class_loader(), JAVA_LANG_CLASS);
+            init_class(thread, &class_class);
+            let jptypes = new_jobject_array(class_class, ptypes.len());
+            for (i, ptype) in ptypes.into_iter().enumerate() {
+                let ptype_class = load_class(class.class_loader(), &ptype);
+                init_class(thread, &ptype_class);
+                jptypes.set(i, ptype_class.mirror_class());
+            }
+            set_object_field(
+                method_type,
+                "ptypes",
+                &format!("[L{};", JAVA_LANG_CLASS),
+                jptypes,
+            );
+            method_type.into()
+        }
+        ConstPoolInfo::ConstantMethodHandleInfo {
+            reference_kind,
+            reference_index,
+        } => unimplemented!(),
         _ => unreachable!(),
     };
     thread.push(n);

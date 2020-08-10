@@ -1,6 +1,6 @@
 use crate::gc::mem::align_usize;
 use crate::gc::oop::Oop;
-use std::sync::atomic::AtomicPtr;
+use std::sync::atomic::{AtomicI32, AtomicPtr};
 use std::{fmt, mem};
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -42,6 +42,11 @@ impl Address {
     #[inline(always)]
     pub fn as_atomic_ptr(&self) -> &AtomicPtr<Oop> {
         unsafe { &*self.as_ptr::<AtomicPtr<Oop>>() }
+    }
+
+    #[inline(always)]
+    pub fn as_atomic_i32(&self) -> &AtomicI32 {
+        unsafe { &*self.as_ptr::<AtomicI32>() }
     }
 
     #[inline(always)]

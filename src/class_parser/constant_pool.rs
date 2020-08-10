@@ -190,7 +190,7 @@ impl ConstPool {
     }
 }
 
-#[derive(Debug, EnumIsA, EnumAsGetters)]
+#[derive(Debug, EnumIsA, EnumAsGetters, Clone)]
 pub enum ConstPoolInfo {
     ConstantClassInfo {
         name_index: u16,

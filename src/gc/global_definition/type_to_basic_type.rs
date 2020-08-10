@@ -1,16 +1,17 @@
 use crate::gc::global_definition::{
     BasicType, JArray, JBoolean, JByte, JChar, JDouble, JFloat, JInt, JLong, JObject, JShort,
 };
+use std::marker::PhantomData;
 
 pub struct TypeToBasicType<T> {
-    v: Option<T>,
+    v: PhantomData<T>,
 }
 
-pub fn type_to_basic_type<T>(v: Option<T>) -> BasicType
+pub fn type_to_basic_type<T>(_v: Option<T>) -> BasicType
 where
     TypeToBasicType<T>: Into<BasicType>,
 {
-    TypeToBasicType { v }.into()
+    TypeToBasicType { v: PhantomData }.into()
 }
 
 pub fn size_of_java_type<T>(v: Option<T>) -> usize

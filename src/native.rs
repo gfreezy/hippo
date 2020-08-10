@@ -1,7 +1,9 @@
 #![allow(non_snake_case, unused_variables)]
 
 use crate::class::{is_primitive_class, Class};
-use crate::class_loader::{get_class_by_id, init_class, load_class, load_mirror_class};
+use crate::class_loader::{
+    get_class_by_id, get_class_from_jclass, init_class, load_class, load_mirror_class,
+};
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
 use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
@@ -12,7 +14,8 @@ use crate::java_const::{
 };
 use crate::jenv::{
     alloc_jobject, get_java_class_object, get_java_string, get_object_field, new_java_lang_string,
-    new_jobject, new_jobject_array, set_object_field, JTHREAD, STRING_MAP, THREADS,
+    new_jobject, new_jobject_array, set_object_field, set_static_field, JTHREAD, STRING_MAP,
+    THREADS,
 };
 use crate::jthread::JvmThread;
 use crate::jvm::{execute_method, execute_method_by_name};
@@ -38,12 +41,12 @@ pub fn java_lang_Class_isPrimitive(thread: &mut JvmThread, class: &Class, args: 
 }
 
 pub fn java_lang_Class_isAssignableFrom(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
-    let self_class = args[0].as_jobject();
-    let from_class = args[1].as_jobject();
-    let self_mirror_class = get_class_by_id(self_class.class_id())
-        .as_instance_mirror_class()
-        .unwrap();
-    // todo
+    let self_jclass = args[0].as_jobject();
+    let from_jclass = args[1].as_jobject();
+    let self_class = get_class_from_jclass(class.class_loader(), self_jclass);
+    let from_class = get_class_from_jclass(class.class_loader(), from_jclass);
+    let ret = can_cast_to(thread, from_class, self_class);
+    thread.push_jbool(ret);
 }
 
 pub fn java_lang_Class_getDeclaredFields0(
@@ -203,6 +206,21 @@ pub fn java_lang_Object_hashCode(thread: &mut JvmThread, _class: &Class, args: V
 pub fn java_lang_System_registerNatives(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
 }
 
+pub fn java_lang_System_setIn0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let stream = args[0].as_jobject();
+    set_static_field(class, "in", "Ljava/io/InputStream;", stream);
+}
+
+pub fn java_lang_System_setOut0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let stream = args[0].as_jobject();
+    set_static_field(class, "out", "Ljava/io/PrintStream;", stream);
+}
+
+pub fn java_lang_System_setErr0(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let stream = args[0].as_jobject();
+    set_static_field(class, "err", "Ljava/io/PrintStream;", stream);
+}
+
 pub fn java_lang_Object_registerNatives(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
 }
 
@@ -233,6 +251,14 @@ pub fn sun_misc_Unsafe_arrayIndexScale(thread: &mut JvmThread, class: &Class, ar
         v => unreachable!("{:?}", v),
     };
     thread.push_jint(scale as JInt)
+}
+
+pub fn sun_misc_Unsafe_getIntVolatile(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
+    // todo: volatile
+    let obj = args[1].as_jobject();
+    let offset = args[2].as_jlong();
+    let val = obj.get_field_by_offset::<JInt>(offset as usize);
+    thread.push_jint(val);
 }
 
 pub fn sun_misc_Unsafe_addressSize(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
@@ -401,6 +427,29 @@ pub fn sun_misc_Unsafe_compareAndSwapObject(
     thread.push_jbool(success)
 }
 
+pub fn sun_misc_Unsafe_compareAndSwapInt(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
+    let (unsafe_obj, p, offset, e, x) = match args.as_slice() {
+        [JValue::Object(unsafe_obj), JValue::Object(p), JValue::Long(offset), JValue::Int(e), JValue::Int(x)] => {
+            (unsafe_obj, p, *offset, *e, *x)
+        }
+        _ => unreachable!(),
+    };
+    let success = compare_and_swap_int(p, offset, e, x);
+    assert!(success);
+    thread.push_jbool(success)
+}
+
+fn compare_and_swap_int(obj: &JObject, offset: i64, expect: i32, target: i32) -> bool {
+    let addr = obj
+        .oop()
+        .address()
+        .plus(InstanceOopDesc::base_offset_in_bytes() + offset as usize);
+    let p = addr.as_atomic_i32();
+    let old = p.compare_and_swap(expect, target, Ordering::SeqCst);
+    let success = old == expect;
+    success
+}
+
 fn compare_and_swap_object(obj: &JObject, offset: i64, expect: &JObject, target: &JObject) -> bool {
     let target_oop = target.oop().address();
     let expect_oop = expect.oop().address();
@@ -519,6 +568,21 @@ mod tests {
 
         let ret = compare_and_swap_object(&obj, f.offset() as i64, &expect.into(), &target.into());
         assert_eq!(obj.get_field_by_offset::<JArray>(f.offset()), target);
+        assert!(ret);
+    }
+
+    #[test]
+    fn test_compare_and_swap_int() {
+        let _jvm = setup_jvm();
+        let expect = 10;
+        let target = 20;
+        let class = load_class(JObject::null(), JAVA_LANG_STRING);
+        let obj = alloc_jobject(&class);
+        let f = class.get_field("hash", "I").unwrap();
+        obj.set_field_by_offset(f.offset(), expect);
+
+        let ret = compare_and_swap_int(&obj, f.offset() as i64, expect, target);
+        assert_eq!(obj.get_field_by_offset::<JInt>(f.offset()), target);
         assert!(ret);
     }
 

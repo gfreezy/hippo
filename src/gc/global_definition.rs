@@ -540,7 +540,7 @@ impl JValue {
     pub fn as_jlong(&self) -> JLong {
         match self {
             JValue::Long(a) => *a,
-            _ => unreachable!(),
+            v => unreachable!("{:?}", v),
         }
     }
 
