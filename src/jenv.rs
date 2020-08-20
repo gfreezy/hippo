@@ -142,6 +142,9 @@ pub fn get_java_string(obj: JObject) -> String {
     let class = load_class(JObject::null(), JAVA_LANG_STRING);
     let f = class.get_field("value", "[C").unwrap();
     let chars_ref = obj.get_field_by_offset::<JArray>(f.offset());
+    if chars_ref.is_null() {
+        return "".to_string();
+    }
     let bytes: Vec<u16> = chars_ref.as_slice().to_vec();
     String::from_utf16(&bytes).unwrap()
 }

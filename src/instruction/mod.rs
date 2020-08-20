@@ -356,6 +356,7 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
 
     let class_id = object_ref.class_id();
     let object_class = get_class_by_id(class_id);
+    dbg!(&object_class);
 
     let acutal_method = if !resolved_method.is_signature_polymorphic() {
         if let Some(actual_method) = object_class
@@ -1137,4 +1138,12 @@ pub fn lookupswitch(thread: &mut JvmThread, class: &Class) {
     //     "\tlocals: {:?}\n\toperand_stack:{:?}",
     //     frame.local_variable_array, frame.operand_stack,
     // );
+}
+
+pub fn monitorenter(thread: &mut JvmThread, class: &Class) {
+    let _ = thread.pop_jobject();
+}
+
+pub fn monitorexit(thread: &mut JvmThread, class: &Class) {
+    let _ = thread.pop_jobject();
 }

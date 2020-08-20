@@ -172,9 +172,12 @@ pub fn java_lang_System_initProperties(thread: &mut JvmThread, _class: &Class, a
         ("java.version", "1.8"),
         ("java.vendor", "hippo"),
         ("java.vendor.url", "https://github.com/gfreezy/hippo"),
-        ("java.home", "/Users/feichao"),
+        ("java.home", "/Users/feichao/Develop/allsunday/hippo/jre"),
         ("java.class.version", "1.8"),
-        ("java.class.path", "/Users/feichao"),
+        (
+            "java.class.path",
+            "/Users/feichao/Develop/allsunday/hippo/jre/lib/rt",
+        ),
         ("os.name", "macos"),
         ("os.arch", "x64"),
         ("os.version", "10.115.4"),
@@ -184,6 +187,7 @@ pub fn java_lang_System_initProperties(thread: &mut JvmThread, _class: &Class, a
         ("user.name", "feichao"),
         ("user.home", "/Users/feichao"),
         ("user.dir", "/Users/feichao"),
+        ("file.encoding", "UTF-8"),
     ];
     for (key, value) in systemProperties {
         let key = JValue::Object(new_java_lang_string(key));
@@ -191,8 +195,7 @@ pub fn java_lang_System_initProperties(thread: &mut JvmThread, _class: &Class, a
         let args = vec![props_ref.clone(), key, value];
         execute_method(thread, method.clone(), args);
     }
-    let frame = thread.current_frame_mut();
-    frame.operand_stack.push(props_ref.clone());
+    thread.push(*props_ref);
 }
 
 pub fn java_lang_Object_hashCode(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {
@@ -226,7 +229,7 @@ pub fn java_lang_Object_registerNatives(thread: &mut JvmThread, _class: &Class, 
 
 pub fn registerNatives(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
 
-pub fn sun_misc_VM_initalize(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
+pub fn sun_misc_VM_initialize(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
 
 pub fn sun_misc_Unsafe_registerNatives(thread: &mut JvmThread, _class: &Class, args: Vec<JValue>) {}
 
@@ -313,7 +316,10 @@ pub fn java_security_AccessController_doPrivileged(
     let method = class
         .get_method("run", "()Ljava/lang/Object;", false)
         .unwrap();
-    execute_method(thread, method, vec![JValue::Object(action)])
+    execute_method(thread, method, vec![JValue::Object(action)]);
+    let val = thread.pop();
+    eprintln!("doPrivileged: action: {:?}, {:?}", action, &val);
+    thread.push(val);
 }
 
 pub fn java_lang_Thread_currentThread(thread: &mut JvmThread, class: &Class, args: Vec<JValue>) {
@@ -366,6 +372,7 @@ pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Ve
     let name = get_java_string(args[0].as_jobject());
     let class_name = name.replace('.', "/");
     let class = load_class(class.class_loader(), &class_name);
+    eprintln!("for_name0: {}, {:?}", &name, &class);
     thread.push_jobject(class.mirror_class());
 }
 
@@ -374,6 +381,7 @@ pub fn java_security_AccessController_getStackAccessControlContext(
     class: &Class,
     args: Vec<JValue>,
 ) {
+    // todo
     thread.push_jobject(JObject::null());
 }
 

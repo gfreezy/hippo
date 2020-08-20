@@ -448,7 +448,6 @@ pub fn execute_class_method(
             opcode::LDC_W => {
                 ldc_w(thread, &class);
             }
-
             opcode::SIPUSH => {
                 sipush(thread, &class);
             }
@@ -512,7 +511,12 @@ pub fn execute_class_method(
             opcode::LOOKUPSWITCH => {
                 lookupswitch(thread, &class);
             }
-            opcode::MONITORENTER | opcode::MONITOREXIT => {}
+            opcode::MONITORENTER => {
+                monitorenter(thread, &class);
+            }
+            opcode::MONITOREXIT => {
+                monitorexit(thread, &class);
+            }
             op => unimplemented!("{}", show_opcode(op)),
         }
     }
@@ -570,7 +574,7 @@ fn execute_native_method(thread: &mut JvmThread, class: &Class, method: Method, 
             registerNatives(thread, class, args);
         }
         ("sun/misc/VM", "initialize", "()V") => {
-            sun_misc_VM_initalize(thread, class, args);
+            sun_misc_VM_initialize(thread, class, args);
         }
         ("sun/misc/Unsafe", "registerNatives", "()V") => {
             sun_misc_Unsafe_registerNatives(thread, class, args);

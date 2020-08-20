@@ -6,6 +6,8 @@ use crate::gc::oop::{ArrayOop, InstanceOop, Oop};
 
 use crate::class::ClassId;
 use crate::class_loader::get_class_by_id;
+use crate::java_const::JAVA_LANG_STRING;
+use crate::jenv::get_java_string;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::fmt;
@@ -205,6 +207,10 @@ impl Serialize for JObject {
         } else if self.class_id() > 0 {
             let class = get_class_by_id(self.class_id());
             state.serialize_field("class", class.name())?;
+            if class.name() == JAVA_LANG_STRING {
+                let s = get_java_string(*self);
+                state.serialize_field("value", &s)?;
+            }
             state.serialize_field("oop", &self.oop().to_string())?;
         } else {
             state.serialize_field("class", "Null")?;
