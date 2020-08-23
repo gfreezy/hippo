@@ -5,6 +5,7 @@ use crate::class_loader::{
     get_class_by_id, get_class_from_jclass, init_class, load_class, load_mirror_class,
 };
 use crate::class_parser::JVM_RECOGNIZED_FIELD_MODIFIERS;
+use crate::debug::pretty_print;
 use crate::gc::global_definition::{JArray, JInt, JLong, JObject, JValue};
 use crate::gc::oop_desc::{ArrayOopDesc, InstanceOopDesc};
 use crate::instruction::can_cast_to;
@@ -318,7 +319,6 @@ pub fn java_security_AccessController_doPrivileged(
         .unwrap();
     execute_method(thread, method, vec![JValue::Object(action)]);
     let val = thread.pop();
-    eprintln!("doPrivileged: action: {:?}, {:?}", action, &val);
     thread.push(val);
 }
 
@@ -372,7 +372,6 @@ pub fn java_lang_Class_for_Name0(thread: &mut JvmThread, class: &Class, args: Ve
     let name = get_java_string(args[0].as_jobject());
     let class_name = name.replace('.', "/");
     let class = load_class(class.class_loader(), &class_name);
-    eprintln!("for_name0: {}, {:?}", &name, &class);
     thread.push_jobject(class.mirror_class());
 }
 
@@ -529,26 +528,34 @@ pub fn sun_misc_Unsafe_objectFieldOffset(
     thread.push_jlong(offset as JLong);
 }
 
+pub fn java_lang_Class_isInterface(
+    thread: &mut JvmThread,
+    current_class: &Class,
+    args: Vec<JValue>,
+) {
+    assert_eq!(args.len(), 1);
+    let jclass = args[0].as_jobject();
+    pretty_print(jclass);
+    let class = get_class_from_jclass(current_class.class_loader(), jclass);
+    let is_interface = class.is_interface();
+    thread.push_jbool(is_interface);
+}
+
 #[cfg(test)]
 mod tests {
     use super::java_lang_System_arraycopy;
     use super::*;
     use crate::class_loader::load_class;
-    use crate::debug::pretty_print;
     use crate::frame::JvmFrame;
     use crate::gc::global_definition::{BasicType, JArray, JChar, JObject, JValue};
-    use crate::gc::oop::Oop;
-    use crate::gc::oop_desc::InstanceOopDesc;
     use crate::java_const::JAVA_LANG_STRING;
-    use crate::jenv::{alloc_jobject, new_java_lang_string, new_jtype_array, JTHREAD};
+    use crate::jenv::{alloc_jobject, new_jtype_array, JTHREAD};
     use crate::jvm::Jvm;
     use crate::native::compare_and_swap_object;
-    use fxhash::FxHashSet;
     use std::collections::HashSet;
-    use std::sync::atomic::{AtomicPtr, Ordering};
 
     fn setup_jvm() -> Jvm {
-        let jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        let jvm = Jvm::default();
         JTHREAD.with(|t| {
             let thread = &mut *t.borrow_mut();
             let class = load_class(JObject::null(), JAVA_LANG_THREAD);

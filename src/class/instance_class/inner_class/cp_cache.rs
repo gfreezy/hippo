@@ -7,6 +7,7 @@ pub struct CpCache {
     cache: Vec<CpCacheEntry>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 enum CpCacheEntry {
     StaticField(Class, BasicType, usize),
@@ -50,6 +51,6 @@ impl CpCache {
     }
 
     pub fn resolve_method(&mut self, _pc: usize) -> CpCache {
-        unimplemented!()
+        todo!()
     }
 }

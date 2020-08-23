@@ -79,9 +79,6 @@ impl Deref for InstanceOop {
 pub struct ArrayOop(Oop);
 
 impl ArrayOop {
-    fn addr(&self) -> Address {
-        (self.0).0
-    }
     pub fn oop(&self) -> Oop {
         self.0
     }

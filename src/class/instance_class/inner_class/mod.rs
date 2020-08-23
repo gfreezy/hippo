@@ -201,10 +201,6 @@ impl InnerClass {
             .chain(self.static_fields.values())
     }
 
-    pub fn total_self_instance_fields(&self) -> usize {
-        self.instance_fields.len()
-    }
-
     pub fn methods(&self) -> &[Method] {
         &self.methods
     }
@@ -226,14 +222,6 @@ impl InnerClass {
 
     pub fn iter_super_classes(&self) -> SuperClassesIter {
         SuperClassesIter(self.super_class.clone())
-    }
-
-    pub fn total_instance_fields(&self) -> usize {
-        self.total_self_instance_fields()
-            + self
-                .super_class()
-                .map(|class| class.total_instance_fields())
-                .unwrap_or(0)
     }
 
     pub fn did_implement_interface(&self, interface: Class) -> bool {

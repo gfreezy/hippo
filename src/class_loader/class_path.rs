@@ -74,7 +74,12 @@ impl Entry {
                 trace!("read class {} using Zip", class_file_name);
                 let file = File::open(path)?;
                 let mut zip = zip::ZipArchive::new(file)?;
-                let mut file = zip.by_name(&class_file_name)?;
+                let mut file = zip.by_name(&class_file_name).map_err(|e| {
+                    io::Error::new(
+                        ErrorKind::NotFound,
+                        format!("not found in jar, from {:?}", e),
+                    )
+                })?;
                 let mut buf = Vec::<u8>::with_capacity(file.size() as usize);
                 file.read_to_end(&mut buf).expect("read file content");
                 Ok(buf)
@@ -144,5 +149,18 @@ fn get_jre(jre_opt: Option<String>) -> String {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_from_jar() {
+        let java_home: PathBuf = std::env::var("JAVA_HOME").unwrap().into();
+        let entry = Entry::new(java_home.join("jre/lib/charsets.jar").to_str().unwrap());
+        let ret = entry.read_class("sun/nio/cs/ext/ExtendedCharsets.class");
+        assert!(ret.is_ok());
     }
 }

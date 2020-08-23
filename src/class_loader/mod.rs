@@ -108,6 +108,7 @@ pub fn init_class(thread: &mut JvmThread, class: &Class) {
 }
 
 pub fn load_class(loader: JObject, mut name: &str) -> Class {
+    assert!(loader.is_null());
     name = name.trim_start_matches('L').trim_end_matches(';');
     if let Some(class) = get_class_by_name(name) {
         assert_eq!(class.class_loader(), loader);
@@ -117,7 +118,7 @@ pub fn load_class(loader: JObject, mut name: &str) -> Class {
         let boot_loader = BOOTSTRAP_LOADER.get().expect("get bootstrap_loader");
         boot_loader.load_class(name)
     } else {
-        unreachable!()
+        todo!("user defined class loader");
     };
     let _class_id = register_class(class.clone(), loader.clone());
     class

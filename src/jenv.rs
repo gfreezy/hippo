@@ -232,24 +232,12 @@ pub fn did_override_method(method: &Method, other: &Method) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::class_loader::bootstrap_class_loader::BootstrapClassLoader;
-    use crate::class_loader::class_path::ClassPath;
-    use crate::class_loader::BOOTSTRAP_LOADER;
-    use crate::gc::allocator_local::AllocatorLocal;
-    use crate::gc::space::Space;
     use crate::jenv::{get_java_string, new_java_lang_string};
     use crate::jvm::Jvm;
-    use std::sync::Arc;
-
-    fn init() -> Jvm {
-        let jre = Some("./jre".to_string());
-        let cp = Some("./jre/lib/rt".to_string());
-        Jvm::new(jre, cp)
-    }
 
     #[test]
     fn test_new_string() {
-        let _ = init();
+        let _ = Jvm::default();
         let s = "hello";
         let obj = new_java_lang_string(s);
         let s2 = get_java_string(obj);

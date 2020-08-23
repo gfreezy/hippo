@@ -21,7 +21,7 @@ fn main() {
         .init();
     deadlock_detector();
 
-    let mut jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+    let mut jvm = Jvm::default();
     jvm.run("main/Main");
 }
 

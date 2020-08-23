@@ -45,7 +45,7 @@ pub fn dump_space() {
     iter_blocks(|block| dump_block(block))
 }
 
-pub fn pretty_write(
+fn pretty_write(
     v: impl Into<RcDoc<'static>>,
     width: usize,
     f: &mut impl Write,
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_pretty_print_jobject() {
-        let _jvm = Jvm::new(Some("./jre".to_string()), Some("./jre/lib/rt".to_string()));
+        let _jvm = Jvm::default();
         let s = new_java_lang_string("hello");
         pretty_print(s);
         dump_space();

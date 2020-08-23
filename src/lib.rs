@@ -8,6 +8,7 @@ pub mod gc;
 pub mod instruction;
 pub mod java_const;
 pub mod jenv;
+pub mod jni;
 pub mod jthread;
 pub mod jvm;
 pub mod native;

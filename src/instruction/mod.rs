@@ -356,7 +356,6 @@ pub fn invokevirtual(thread: &mut JvmThread, class: &Class) {
 
     let class_id = object_ref.class_id();
     let object_class = get_class_by_id(class_id);
-    dbg!(&object_class);
 
     let acutal_method = if !resolved_method.is_signature_polymorphic() {
         if let Some(actual_method) = object_class
